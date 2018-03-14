@@ -177,7 +177,7 @@ public:
 		tilesize[1] = 32;
 		ftsz[0] = (Flt)tilesize[0];
 		ftsz[1] = (Flt)tilesize[1];
-		tile_base = 220.0;
+		tile_base = 100.0;
 		//read level
 		FILE *fpi = fopen("level1.txt","r");
 		if (fpi) {
@@ -196,12 +196,12 @@ public:
 			fclose(fpi);
 			//printf("nrows of background data: %i\n", nrows);
 		}
-		for (int i=0; i<nrows; i++) {
-			for (int j=0; j<ncols; j++) {
-				printf("%c", arr[i][j]);
-			}
-			printf("\n");
-		}
+	//	for (int i=0; i<nrows; i++) {
+	//		for (int j=0; j<ncols; j++) {
+	//			printf("%c", arr[i][j]);
+	//		}
+	//		printf("\n");
+	//	}
 	}
 	void removeCrLf(char *str) {
 		char *p = str;
@@ -515,6 +515,10 @@ void checkKeys(XEvent *e)
 	if (shift) {}
 	switch (key) {
 	    	case XK_p:
+		    	if (gl.state == STATE_GAMEPLAY) {
+			    gl.state = STATE_STARTUP;
+			    break;
+			}
 		    	gl.state = STATE_GAMEPLAY;
 		    	break;
 		case XK_s:
@@ -584,7 +588,7 @@ Flt VecNormalize(Vec vec)
 
 void physics(void)
 {
-	if (gl.walk || gl.keys[XK_Right] || gl.keys[XK_Left]) {
+	if (/*gl.walk || */gl.keys[XK_Right] || gl.keys[XK_Left]) {
 		//man is walking...
 		//when time is up, advance the frame.
 		timers.recordTime(&timers.timeCurrent);
@@ -693,14 +697,14 @@ void render(void)
 	//Clear the screen
 	glClearColor(0.1, 0.1, 0.1, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
-	float cx = gl.xres/2.0;
-	float cy = gl.yres/2.0;
+	float cx = gl.xres/4.0;
+	float cy = gl.yres/4.0;
 	//
 	//show ground
 	glBegin(GL_QUADS);
 		glColor3f(0.2, 0.2, 0.2);
-		glVertex2i(0,       220);
-		glVertex2i(gl.xres, 220);
+		glVertex2i(0,       100);
+		glVertex2i(gl.xres, 100);
 		glColor3f(0.4, 0.4, 0.4);
 		glVertex2i(gl.xres,   0);
 		glVertex2i(0,         0);
@@ -804,7 +808,7 @@ void render(void)
 	//glEnd();
 	//
 	//
-	float h = 200.0;
+	float h = 100.0;
 	float w = h * 0.5;
 	glPushMatrix();
 	glColor3f(1.0, 1.0, 1.0);
@@ -906,12 +910,12 @@ void render(void)
 	}
 	//check for startup state
 	if (gl.state == STATE_STARTUP) {
-	    	h = 100.0;
-		w = 200.0;			
+	    	h = gl.yres;
+		w = gl.xres;			
 		glPushMatrix();
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glColor4f(1.0,1.0,0.0,0.8);
+		glColor4f(0.45,0.45,0.45,0.8);
 		glTranslated(gl.xres/2, gl.yres/2, 0);
 		glBegin(GL_QUADS);
 			glVertex2i(-w, -h);
