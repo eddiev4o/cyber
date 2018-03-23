@@ -115,6 +115,8 @@ public:
 	double delay;
 	Ppmimage *walkImage;
 	GLuint walkTexture;
+	Ppmimage *cyberMenuImage;
+	GLuint cyberMenuTexture;
 	Vec box[20];
 	Sprite exp;
 	Sprite exp44;
@@ -135,12 +137,13 @@ public:
 		done=0;
 		movie=0;
 		movieStep=2;
-		xres=800;
+		xres=1000;
 		yres=600;
 		walk=0;
 		httpFrame=0;
 		walkFrame=0;
 		walkImage=NULL;
+		cyberMenuImage=NULL;
 		delay = 0.1;
 		exp.onoff=0;
 		exp.frame=0;
@@ -349,7 +352,22 @@ void initOpengl(void)
 	//Do this to allow fonts
 	glEnable(GL_TEXTURE_2D);
 	initialize_fonts();
-	//
+	//=====================================
+	// Convert Images
+	system("convert ./images/cyberMenu.png ./images/cyberMenu.ppm");
+	//=========================
+	// Get Images
+	//======================================
+	gl.cyberMenuImage = ppm6GetImage("./images/cyberMenu.ppm");
+	//=======================================
+	// Generate Textures
+	glGenTextures(1, &gl.cyberMenuTexture);
+	//======================================
+
+
+
+
+
 	//load the images file into a ppm structure.
 	//
 	system("convert ./images/walk.gif ./images/walk.ppm");
@@ -410,6 +428,18 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, xData);
 	free(xData);
 	unlink("./images/exp44.ppm");
+	//------------------------------------------------------
+	//Cyber Menu Logo
+	w = gl.cyberMenuImage->width;
+	h = gl.cyberMenuImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.cyberMenuTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *cyberMenuData = buildAlphaData(gl.cyberMenuImage);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, cyberMenuData);
+	free(cyberMenuData);
+	unlink("./images/cyberMenu.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -898,7 +928,6 @@ void render(void)
 	r.bot = gl.yres - 20;
 	r.left = 10;
 	r.center = 0;
-	ggprint8b(&r, 16, c, "W   Walk cycle");
 	ggprint8b(&r, 16, c, "E   Explosion");
 	ggprint8b(&r, 16, c, "+   faster");
 	ggprint8b(&r, 16, c, "-   slower");
@@ -913,9 +942,10 @@ void render(void)
 	    	h = gl.yres;
 		w = gl.xres;			
 		glPushMatrix();
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glColor4f(0.45,0.45,0.45,0.8);
+		//glEnable(GL_BLEND);
+		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		//glColor4f(0.45,0.45,0.45,0.8);
+		glColor3f(0.2,0.2,0.2);
 		glTranslated(gl.xres/2, gl.yres/2, 0);
 		glBegin(GL_QUADS);
 			glVertex2i(-w, -h);
@@ -923,15 +953,31 @@ void render(void)
 			glVertex2i(w,   h);
 			glVertex2i(w,  -h);
 		glEnd();
-		glDisable(GL_BLEND);
+		//glDisable(GL_BLEND);
 		glPopMatrix();
-		r.bot = gl.yres/2 + 80;
-		r.left = gl.xres/2;
-		r.center = 1;
-		ggprint8b(&r, 16, 0, "STARTUP SCREEN");
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+	    	float h1 = 200;
+		float w1 = 200;			
+		glPushMatrix();
+		glColor3f(0.75,0.75,0.75);
+		glTranslated(gl.xres/2, gl.yres/2 + 100, 0);
+		glBindTexture(GL_TEXTURE_2D, gl.cyberMenuTexture);
+		glEnable(GL_ALPHA_TEST);
+		glAlphaFunc(GL_GREATER, 0.0f);
+		glBegin(GL_QUADS);
+			glTexCoord2f(0.0, 1.0); glVertex2i(-w1, -h1);
+			glTexCoord2f(0.0, 0.0); glVertex2i(-w1,  h1);
+			glTexCoord2f(1.0, 0.0); glVertex2i(w1,   h1);
+			glTexCoord2f(1.0, 1.0); glVertex2i(w1,  -h1);
+		glEnd();
+		glPopMatrix();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glDisable(GL_ALPHA_TEST);
+		
+		r.bot = gl.yres/2 - 100;
 		r.center = 0;
 		r.left = gl.xres/2 - 100;
-		ggprint8b(&r, 16, 0, "Press W - Walk Cycle");
 		ggprint8b(&r, 16, 0, "Press P - Play");
 
 	
