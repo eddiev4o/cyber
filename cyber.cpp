@@ -1,7 +1,7 @@
 //3350
-//program: walk.cpp
-//author:  Gordon Griesel
-//date:    summer 2017
+//program: cyber.cpp
+//author:  Eddie Velasco
+//date:    Spring 2018
 //
 //Walk cycle using a sprite sheet.
 //images courtesy: http://games.ucla.edu/resource/walk-cycles/
@@ -37,7 +37,7 @@ typedef Flt	Matrix[4][4];
 const float timeslice = 1.0f;
 const float gravity = -0.2f;
 #define ALPHA 1
-
+#define GRAVITY -0.5f
 //X Windows variables
 Display *dpy;
 Window win;
@@ -52,6 +52,9 @@ void checkKeys(XEvent *e);
 void init();
 void physics(void);
 void render(void);
+void renderBackground(void);
+void StartJump(void);
+void EndJump(void);
 //-----------------------------------------------------------------------------
 //Setup timers
 class Timers {
@@ -60,6 +63,7 @@ public:
 	double oobillion;
 	struct timespec timeStart, timeEnd, timeCurrent;
 	struct timespec walkTime;
+	struct timespec jumpTime;
 	struct timespec httpTime;
 	Timers() {
 		physicsRate = 1.0 / 30.0;
@@ -84,6 +88,8 @@ public:
 	int frame;
 	double delay;
 	Vec pos;
+	Vec vel;
+	bool onGround;
 	Ppmimage *image;
 	GLuint tex;
 	struct timespec time;
@@ -111,19 +117,32 @@ public:
 	int movie, movieStep;
 	int walk;
 	int walkFrame;
+	int jumpFrame;
+	int jumpFlag;
+	double jumpDelay;
+	double jumpHt;
 	int httpFrame;
 	double delay;
-	Ppmimage *walkImage;
-	GLuint walkTexture;
-	Ppmimage *cyberMenuImage;
-	GLuint cyberMenuTexture;
 	Vec box[20];
 	Sprite exp;
 	Sprite exp44;
+	Sprite mainChar;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
 	Vec ball_pos;
 	Vec ball_vel;
+	Flt xc[2];
+	Flt yc[2];		
+	//PPM IMAGES
+	//Ppmimage *walkImage;
+	Ppmimage *cyberMenuImage;
+	Ppmimage *cyberstreetImage;
+	//---------------------------
+	//TEXTURES
+	//GLuint walkTexture;
+	GLuint cyberMenuTexture;
+	GLuint cyberstreetTexture;
+	//---------------------------
 	~Global() {
 		logClose();
 	}
@@ -142,9 +161,14 @@ public:
 		walk=0;
 		httpFrame=0;
 		walkFrame=0;
-		walkImage=NULL;
+		jumpFrame=0;
+		jumpFlag=0;
+		jumpDelay=0.10;
+		jumpHt = 200.0;
+		mainChar.image=NULL;
 		cyberMenuImage=NULL;
-		delay = 0.1;
+		cyberstreetImage=NULL;
+		delay = 0.05;
 		exp.onoff=0;
 		exp.frame=0;
 		exp.image=NULL;
@@ -153,6 +177,11 @@ public:
 		exp44.frame=0;
 		exp44.image=NULL;
 		exp44.delay = 0.022;
+		mainChar.pos[1] = 0.0;
+		mainChar.pos[2] = 0.0;
+		mainChar.vel[0] = 0.0;
+		mainChar.vel[1] = 0.0;
+		mainChar.onGround = false;
 		for (int i=0; i<20; i++) {
 			box[i][0] = rnd() * xres;
 			box[i][1] = rnd() * (yres-220) + 220.0;
@@ -164,7 +193,7 @@ public:
 
 class Level {
 public:
-	unsigned char arr[16][80];
+	unsigned char arr[21][700];
 	int nrows, ncols;
 	int dynamicHeight[180];
 	int tilesize[2];
@@ -185,8 +214,8 @@ public:
 		FILE *fpi = fopen("level1.txt","r");
 		if (fpi) {
 			nrows=0;
-			char line[100];
-			while (fgets(line, 100, fpi) != NULL) {
+			char line[700];
+			while (fgets(line, 700, fpi) != NULL) {
 				removeCrLf(line);
 				int slen = strlen(line);
 				ncols = slen;
@@ -232,6 +261,12 @@ int main(void)
 			checkMouse(&e);
 			checkKeys(&e);
 		}
+		if(gl.state == STATE_STARTUP) {
+			gl.xc[0] = 0.0;
+			gl.yc[0] = 0.0;
+			gl.xc[1] = 1.0;
+			gl.yc[1] = 1.0;
+		}	
 		physics();
 		render();
 		glXSwapBuffers(dpy, win);
@@ -355,13 +390,16 @@ void initOpengl(void)
 	//=====================================
 	// Convert Images
 	system("convert ./images/cyberMenu.png ./images/cyberMenu.ppm");
+	system("convert ./images/cyberstreet.png ./images/cyberstreet.ppm");
 	//=========================
 	// Get Images
 	//======================================
 	gl.cyberMenuImage = ppm6GetImage("./images/cyberMenu.ppm");
+	gl.cyberstreetImage = ppm6GetImage("./images/cyberstreet.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
+	glGenTextures(1, &gl.cyberstreetTexture);
 	//======================================
 
 
@@ -371,23 +409,23 @@ void initOpengl(void)
 	//load the images file into a ppm structure.
 	//
 	system("convert ./images/walk.gif ./images/walk.ppm");
-	gl.walkImage = ppm6GetImage("./images/walk.ppm");
-	int w = gl.walkImage->width;
-	int h = gl.walkImage->height;
+	gl.mainChar.image = ppm6GetImage("./images/walk.ppm");
+	int w = gl.mainChar.image->width;
+	int h = gl.mainChar.image->height;
 	//
 	//create opengl texture elements
-	glGenTextures(1, &gl.walkTexture);
+	glGenTextures(1, &gl.mainChar.tex);
 	//-------------------------------------------------------------------------
 	//silhouette
 	//this is similar to a sprite graphic
 	//
-	glBindTexture(GL_TEXTURE_2D, gl.walkTexture);
+	glBindTexture(GL_TEXTURE_2D, gl.mainChar.tex);
 	//
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
 	//
 	//must build a new set of data...
-	unsigned char *walkData = buildAlphaData(gl.walkImage);	
+	unsigned char *walkData = buildAlphaData(gl.mainChar.image);	
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
 		GL_RGBA, GL_UNSIGNED_BYTE, walkData);
 	free(walkData);
@@ -440,6 +478,22 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, cyberMenuData);
 	free(cyberMenuData);
 	unlink("./images/cyberMenu.ppm");
+	//------------------------------------------------------
+	//Cyber Street Background
+	w = gl.cyberstreetImage->width;
+	h = gl.cyberstreetImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.cyberstreetTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *cyberstreetData = buildAlphaData(gl.cyberstreetImage);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, cyberstreetData);
+	free(cyberstreetData);
+	unlink("./images/cyberstreet.ppm");
+	gl.xc[0] = 0.0;
+	gl.xc[1] = 1.0;
+	gl.yc[0] = 0.0;
+	gl.yc[1] = 1.0;
 }
 
 void checkResize(XEvent *e)
@@ -524,14 +578,16 @@ void checkKeys(XEvent *e)
 {
 	//keyboard input?
 	static int shift=0;
+	static int up=0;
 	int key = XLookupKeysym(&e->xkey, 0);
 	key = key & 0x0000ffff;
 	gl.keys[key]=1;
 	if (e->type == KeyRelease) {
 		gl.keys[key]=0;
-		if (key == XK_Shift_L || key == XK_Shift_R)
+		if (key == XK_Shift_L || key == XK_Shift_R) {
 			shift=0;
-		return;
+			return;
+		}
 	}
 	if (e->type == KeyPress) {
 		gl.keys[key]=1;
@@ -539,7 +595,22 @@ void checkKeys(XEvent *e)
 			shift=1;
 			return;
 		}
-	} else {
+	} 
+	if (e->type == KeyRelease) {
+		gl.keys[key]=0;
+		if (key == XK_Up) {
+			up=0;
+			return;
+		}
+	}
+	if (e->type == KeyPress) {
+		gl.keys[key]=1;
+		if (key == XK_Shift_L || key == XK_Shift_R) {
+			up=1;
+			return;
+		}
+	} 
+	else {
 		return;
 	}
 	if (shift) {}
@@ -580,6 +651,8 @@ void checkKeys(XEvent *e)
 		case XK_Right:
 			break;
 		case XK_Up:
+			StartJump();
+			printf("jump\n");
 			break;
 		case XK_Down:
 			break;
@@ -616,9 +689,36 @@ Flt VecNormalize(Vec vec)
 	return(len);
 }
 
+void StartJump() 
+{
+	if (gl.mainChar.onGround) {
+		gl.mainChar.vel[1] = 12.0;
+		gl.mainChar.onGround = false;
+	}
+}
+void EndJump() 
+{
+	if (gl.mainChar.vel[1] < 6.0)
+		gl.mainChar.vel[1] = 6.0;
+}
+
 void physics(void)
 {
-	if (/*gl.walk || */gl.keys[XK_Right] || gl.keys[XK_Left]) {
+	gl.mainChar.vel[1] += GRAVITY;
+	gl.mainChar.pos[1] += gl.mainChar.vel[1];
+	gl.mainChar.pos[0] += gl.mainChar.vel[0];
+	if (gl.mainChar.pos[1] < 0.0) {
+		gl.mainChar.pos[1] = 0.0;
+		gl.mainChar.vel[1] = 0.0;
+		gl.mainChar.onGround = true;
+	}	
+//	gl.mainChar.pos[1] += -GRAVITY * 5.8;
+//	if (gl.mainChar.vel[1] <= 0)
+//		gl.mainChar.vel[1] = 0;
+//	if (gl.mainChar.pos[1] <= 0)
+//		gl.mainChar.pos[1] = 0;
+
+	if (gl.keys[XK_Right] || gl.keys[XK_Left] || gl.keys[XK_Up]) {
 		//man is walking...
 		//when time is up, advance the frame.
 		timers.recordTime(&timers.timeCurrent);
@@ -630,22 +730,18 @@ void physics(void)
 				gl.walkFrame -= 16;
 			timers.recordTime(&timers.walkTime);
 		}
-		for (int i=0; i<20; i++) {
-			if (gl.keys[XK_Left]) {
-				gl.box[i][0] += 1.0 * (0.05 / gl.delay);
-				if (gl.box[i][0] > gl.xres + 10.0)
-					gl.box[i][0] -= gl.xres + 10.0;
-				gl.camera[0] -= 2.0/lev.tilesize[0] * (0.05 / gl.delay);
-				if (gl.camera[0] < 0.0)
-					gl.camera[0] = 0.0;
-			} else {
-				gl.box[i][0] -= 1.0 * (0.05 / gl.delay);
-				if (gl.box[i][0] < -10.0)
-					gl.box[i][0] += gl.xres + 10.0;
-				gl.camera[0] += 2.0/lev.tilesize[0] * (0.05 / gl.delay);
-				if (gl.camera[0] < 0.0)
-					gl.camera[0] = 0.0;
-			}
+		if (gl.keys[XK_Left]) {
+			gl.camera[0] -= 2.0/lev.tilesize[0] * (1.0 / gl.delay);
+			if (gl.camera[0] < 0.0)
+				gl.camera[0] = 0.0;
+			gl.xc[0] -= 0.00002;
+			gl.xc[1] -= 0.00002;
+		} else if (gl.keys[XK_Right]) {
+			gl.camera[0] += 2.0/lev.tilesize[0] * (1.0 / gl.delay);
+			if (gl.camera[0] < 0.0)
+				gl.camera[0] = 0.0;
+			gl.xc[0] += 0.0002;
+			gl.xc[1] += 0.0002;
 		}
 		if (gl.exp.onoff) {
 			gl.exp.pos[0] -= 2.0 * (0.05 / gl.delay);
@@ -721,12 +817,29 @@ void physics(void)
 	}
 }
 
+void renderBackground() {
+	glPushMatrix();
+	glColor3f(1.0, 1.0, 1.0);
+	glBindTexture(GL_TEXTURE_2D, gl.cyberstreetTexture);
+	glBegin(GL_QUADS);
+		glTexCoord2f(gl.xc[0], gl.yc[1]); glVertex2i(0,0);
+		glTexCoord2f(gl.xc[0], gl.yc[0]); glVertex2i(0, gl.yres);
+                glTexCoord2f(gl.xc[1], gl.yc[0]); glVertex2i(gl.xres, gl.yres);
+                glTexCoord2f(gl.xc[1], gl.yc[1]); glVertex2i(gl.xres, 0);
+        glEnd();
+        glPopMatrix();
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+}
+
 void render(void)
 {
+	if (gl.state == STATE_GAMEPLAY) {
 	Rect r;
 	//Clear the screen
 	glClearColor(0.1, 0.1, 0.1, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
+	renderBackground();
 	float cx = gl.xres/4.0;
 	float cy = gl.yres/4.0;
 	//
@@ -739,21 +852,6 @@ void render(void)
 		glVertex2i(gl.xres,   0);
 		glVertex2i(0,         0);
 	glEnd();
-	//
-	//show boxes as background
-	for (int i=0; i<20; i++) {
-		glPushMatrix();
-		glTranslated(gl.box[i][0],gl.box[i][1],gl.box[i][2]);
-		glColor3f(0.2, 0.2, 0.2);
-		glBegin(GL_QUADS);
-			glVertex2i( 0,  0);
-			glVertex2i( 0, 30);
-			glVertex2i(20, 30);
-			glVertex2i(20,  0);
-		glEnd();
-		glPopMatrix();
-	}
-	//
 	//----------------------------
 	//Render the level tile system
 	//----------------------------
@@ -841,8 +939,9 @@ void render(void)
 	float h = 100.0;
 	float w = h * 0.5;
 	glPushMatrix();
+	glTranslated(gl.mainChar.pos[0],gl.mainChar.pos[1], 0);
 	glColor3f(1.0, 1.0, 1.0);
-	glBindTexture(GL_TEXTURE_2D, gl.walkTexture);
+	glBindTexture(GL_TEXTURE_2D, gl.mainChar.tex);
 	//
 	glEnable(GL_ALPHA_TEST);
 	glAlphaFunc(GL_GREATER, 0.0f);
@@ -937,10 +1036,12 @@ void render(void)
 	if (gl.movie) {
 		screenCapture();
 	}
+	}
 	//check for startup state
 	if (gl.state == STATE_STARTUP) {
-	    	h = gl.yres;
-		w = gl.xres;			
+	    	int h = gl.yres;
+		int w = gl.xres;			
+		Rect r;
 		glPushMatrix();
 		//glEnable(GL_BLEND);
 		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -974,11 +1075,12 @@ void render(void)
 		glPopMatrix();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glDisable(GL_ALPHA_TEST);
-		
+		unsigned int c = 0x002d88d8;	
 		r.bot = gl.yres/2 - 100;
 		r.center = 0;
 		r.left = gl.xres/2 - 100;
-		ggprint8b(&r, 16, 0, "Press P - Play");
+		ggprint16(&r, 16, c, "PLAY");
+		ggprint16(&r, 16, c, "CREDITS");
 
 	
 	}
