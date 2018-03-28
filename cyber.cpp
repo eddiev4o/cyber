@@ -578,7 +578,6 @@ void checkKeys(XEvent *e)
 {
 	//keyboard input?
 	static int shift=0;
-	static int up=0;
 	int key = XLookupKeysym(&e->xkey, 0);
 	key = key & 0x0000ffff;
 	gl.keys[key]=1;
@@ -599,14 +598,13 @@ void checkKeys(XEvent *e)
 	if (e->type == KeyRelease) {
 		gl.keys[key]=0;
 		if (key == XK_Up) {
-			up=0;
+			EndJump();
 			return;
 		}
 	}
 	if (e->type == KeyPress) {
 		gl.keys[key]=1;
 		if (key == XK_Shift_L || key == XK_Shift_R) {
-			up=1;
 			return;
 		}
 	} 
@@ -698,7 +696,7 @@ void StartJump()
 }
 void EndJump() 
 {
-	if (gl.mainChar.vel[1] < 6.0)
+	if (gl.mainChar.vel[1] > 6.0)
 		gl.mainChar.vel[1] = 6.0;
 }
 
