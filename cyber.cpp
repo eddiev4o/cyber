@@ -1,4 +1,4 @@
-//3350
+//4490
 //program: cyber.cpp
 //author:  Eddie Velasco
 //date:    Spring 2018
@@ -52,6 +52,8 @@ void checkKeys(XEvent *e);
 void init();
 void physics(void);
 void render(void);
+//Functions by self
+void healthBar(void);
 void renderBackground(void);
 void StartJump(void);
 void EndJump(void);
@@ -82,6 +84,13 @@ public:
 } timers;
 //-----------------------------------------------------------------------------
 
+struct Shape {
+    public:
+        float width, height;
+        float radius;
+        Vec center;
+};
+
 class Sprite {
 public:
 	int onoff;
@@ -90,6 +99,7 @@ public:
 	Vec pos;
 	Vec vel;
 	bool onGround;
+	float health;
 	Ppmimage *image;
 	GLuint tex;
 	struct timespec time;
@@ -182,6 +192,7 @@ public:
 		mainChar.vel[0] = 0.0;
 		mainChar.vel[1] = 0.0;
 		mainChar.onGround = false;
+		mainChar.health = 20.0;
 		for (int i=0; i<20; i++) {
 			box[i][0] = rnd() * xres;
 			box[i][1] = rnd() * (yres-220) + 220.0;
@@ -650,7 +661,7 @@ void checkKeys(XEvent *e)
 			break;
 		case XK_Up:
 			StartJump();
-			printf("jump\n");
+			//printf("jump\n");
 			break;
 		case XK_Down:
 			break;
@@ -702,6 +713,7 @@ void EndJump()
 
 void physics(void)
 {
+	
 	gl.mainChar.vel[1] += GRAVITY;
 	gl.mainChar.pos[1] += gl.mainChar.vel[1];
 	gl.mainChar.pos[0] += gl.mainChar.vel[0];
@@ -783,6 +795,8 @@ void physics(void)
 	//move the ball
 	gl.ball_pos[1] += gl.ball_vel[1];
 	gl.ball_vel[1] -= 1.0;
+	//=================================================
+	//Height Calculation
 	Flt dd = lev.ftsz[0];
 	//Flt offy = lev.tile_base;
 	//int ncols_to_render = gl.xres / lev.tilesize[0] + 2;
@@ -813,9 +827,43 @@ void physics(void)
 	    gl.ball_vel[1] = 0.0;
 	    gl.ball_pos[1] = h;
 	}
+	//End of height calculation
+	//==================================================
 }
 
-void renderBackground() {
+void healthBar()
+{
+	Rect r;
+        unsigned int c = 0x008b00;
+        r.bot = gl.yres-30;
+        r.left = (gl.xres/gl.xres) + 20;
+        r.center = 0;
+        ggprint8b(&r, 16, c, "HEALTH");
+        Shape s;
+        Shape box[200];
+        for (int i = 0; i < gl.mainChar.health; i++) {
+                box[i].width = 3;
+                box[i].height = 10;
+                box[i].center[0] = 20 + (i*6);
+                box[i].center[1] = 555;
+                box[i].center[2] = 0;
+                s = box[i];
+                glPushMatrix();
+                glColor3ub(8, 146, 208);
+                glTranslatef(s.center[0], s.center[1], s.center[2]);
+                float w = s.width;
+                float h = s.height;
+                glBegin(GL_QUADS);
+                        glVertex2i(-w, -h);
+                        glVertex2i(-w, h);
+                        glVertex2i(w, h);
+                        glVertex2i(w, -h);
+                        glEnd();
+                glPopMatrix();
+        }	
+}
+void renderBackground()
+{
 	glPushMatrix();
 	glColor3f(1.0, 1.0, 1.0);
 	glBindTexture(GL_TEXTURE_2D, gl.cyberstreetTexture);
@@ -850,6 +898,7 @@ void render(void)
 		glVertex2i(gl.xres,   0);
 		glVertex2i(0,         0);
 	glEnd();
+
 	//----------------------------
 	//Render the level tile system
 	//----------------------------
@@ -907,8 +956,8 @@ void render(void)
 		++col;
 		col = col % lev.ncols;
 	}
+	//===================================
 	//draw ball
-	
 	glColor3f(1.0, 1.0, 0.0);
 	glPushMatrix();
 	glTranslated(gl.ball_pos[0],gl.ball_pos[1], 0);
@@ -919,21 +968,11 @@ void render(void)
 		glVertex2i(10,  0);
 	glEnd();
 	glPopMatrix();
-
-
-
-
-	//
-	//fake shadow
-	//glColor3f(0.25, 0.25, 0.25);
-	//glBegin(GL_QUADS);
-	//	glVertex2i(cx-60, 150);
-	//	glVertex2i(cx+50, 150);
-	//	glVertex2i(cx+50, 130);
-	//	glVertex2i(cx-60, 130);
-	//glEnd();
-	//
-	//
+	//===================================
+	healthBar();
+	//===================================
+	// CHARACTER SPRITE
+	//===================================
 	float h = 100.0;
 	float w = h * 0.5;
 	glPushMatrix();
@@ -1023,13 +1062,13 @@ void render(void)
 	}
 	unsigned int c = 0x00ffff44;
 	r.bot = gl.yres - 20;
-	r.left = 10;
+	r.left = gl.xres-100;
 	r.center = 0;
-	ggprint8b(&r, 16, c, "E   Explosion");
-	ggprint8b(&r, 16, c, "+   faster");
-	ggprint8b(&r, 16, c, "-   slower");
-	ggprint8b(&r, 16, c, "right arrow -> walk right");
-	ggprint8b(&r, 16, c, "left arrow  <- walk left");
+	//ggprint8b(&r, 16, c, "E   Explosion");
+	//ggprint8b(&r, 16, c, "+   faster");
+	//ggprint8b(&r, 16, c, "-   slower");
+	//ggprint8b(&r, 16, c, "right arrow -> walk right");
+	//ggprint8b(&r, 16, c, "left arrow  <- walk left");
 	ggprint8b(&r, 16, c, "frame: %i", gl.walkFrame);
 	if (gl.movie) {
 		screenCapture();
