@@ -193,11 +193,6 @@ public:
 		mainChar.vel[1] = 0.0;
 		mainChar.onGround = false;
 		mainChar.health = 20.0;
-		for (int i=0; i<20; i++) {
-			box[i][0] = rnd() * xres;
-			box[i][1] = rnd() * (yres-220) + 220.0;
-			box[i][2] = 0.0;
-		}
 		memset(keys, 0, 65536);
 	}
 } gl;
@@ -206,12 +201,12 @@ class Level {
 public:
 	unsigned char arr[21][700];
 	int nrows, ncols;
-	int dynamicHeight[180];
+	int dynamicHeight[780];
 	int tilesize[2];
 	Flt ftsz[2];
 	Flt tile_base;
 	Level() {
-	    	for (int i=0; i < 180; i++)
+	    	for (int i=0; i < 780; i++)
 		{
 		    dynamicHeight[i] = -1;
 		}
@@ -220,7 +215,7 @@ public:
 		tilesize[1] = 32;
 		ftsz[0] = (Flt)tilesize[0];
 		ftsz[1] = (Flt)tilesize[1];
-		tile_base = 100.0;
+		tile_base = 0.0;
 		//read level
 		FILE *fpi = fopen("level1.txt","r");
 		if (fpi) {
@@ -239,12 +234,6 @@ public:
 			fclose(fpi);
 			//printf("nrows of background data: %i\n", nrows);
 		}
-	//	for (int i=0; i<nrows; i++) {
-	//		for (int j=0; j<ncols; j++) {
-	//			printf("%c", arr[i][j]);
-	//		}
-	//		printf("\n");
-	//	}
 	}
 	void removeCrLf(char *str) {
 		char *p = str;
@@ -713,21 +702,6 @@ void EndJump()
 
 void physics(void)
 {
-	
-	gl.mainChar.vel[1] += GRAVITY;
-	gl.mainChar.pos[1] += gl.mainChar.vel[1];
-	gl.mainChar.pos[0] += gl.mainChar.vel[0];
-	if (gl.mainChar.pos[1] < 0.0) {
-		gl.mainChar.pos[1] = 0.0;
-		gl.mainChar.vel[1] = 0.0;
-		gl.mainChar.onGround = true;
-	}	
-//	gl.mainChar.pos[1] += -GRAVITY * 5.8;
-//	if (gl.mainChar.vel[1] <= 0)
-//		gl.mainChar.vel[1] = 0;
-//	if (gl.mainChar.pos[1] <= 0)
-//		gl.mainChar.pos[1] = 0;
-
 	if (gl.keys[XK_Right] || gl.keys[XK_Left] || gl.keys[XK_Up]) {
 		//man is walking...
 		//when time is up, advance the frame.
@@ -800,7 +774,7 @@ void physics(void)
 	Flt dd = lev.ftsz[0];
 	//Flt offy = lev.tile_base;
 	//int ncols_to_render = gl.xres / lev.tilesize[0] + 2;
-	int col = (int)(gl.camera[0] / dd) + (500.0 / lev.tilesize[0] + 1.0);
+	int col = (int)(gl.camera[0] / dd) + (232.0 /*500 original*// lev.tilesize[0] + 1.0); //(232.0 / lev +1.0) sprite
 	col = col % lev.ncols;
 	int hgt = 0.0;
 	if (lev.dynamicHeight[col] != -1) {
@@ -813,7 +787,7 @@ void physics(void)
 	    	break;
 	    }
 	}
-	//printf("%s %d \n", "Height Calculated for Column: ", col);
+	//	printf("%s %d is %d \n", "Height Calculated for Column: ", col, lev.dynamicHeight[col]);
 	}
 	for (int i = 0; i < lev.nrows; i++) {
 	    if (lev.arr[i][col] != ' ') {
@@ -823,12 +797,29 @@ void physics(void)
 	}
 	//height of ball is (nrows-1-i)*tile_height + starting point.
 	Flt h = lev.tilesize[1] * (lev.nrows-hgt) + lev.tile_base;
+	printf("%f\n", h);
 	if (gl.ball_pos[1] <= h) {
 	    gl.ball_vel[1] = 0.0;
 	    gl.ball_pos[1] = h;
 	}
 	//End of height calculation
 	//==================================================
+	//================================================================================
+	//JUMP PHYSICS
+    	gl.mainChar.vel[1] += GRAVITY;
+	gl.mainChar.pos[1] += gl.mainChar.vel[1];
+	gl.mainChar.pos[0] += gl.mainChar.vel[0];
+	if (gl.mainChar.pos[1] < 0.0) {
+		gl.mainChar.pos[1] = 0.0;
+		gl.mainChar.vel[1] = 0.0;
+		gl.mainChar.onGround = true;
+	}
+	// else if (gl.mainChar.pos[1] <= h) {
+	//	gl.mainChar.pos[1] = h;
+	//	gl.mainChar.vel[1] = 0.0;
+	//	gl.mainChar.onGround = true;
+	//}	    
+	//=================================================================================
 }
 
 void healthBar()
@@ -887,17 +878,17 @@ void render(void)
 	glClear(GL_COLOR_BUFFER_BIT);
 	renderBackground();
 	float cx = gl.xres/4.0;
-	float cy = gl.yres/4.0;
+	float cy = (gl.yres/4.0)-37.0; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
 	//
 	//show ground
-	glBegin(GL_QUADS);
-		glColor3f(0.2, 0.2, 0.2);
-		glVertex2i(0,       100);
-		glVertex2i(gl.xres, 100);
-		glColor3f(0.4, 0.4, 0.4);
-		glVertex2i(gl.xres,   0);
-		glVertex2i(0,         0);
-	glEnd();
+	//glBegin(GL_QUADS);
+	//	glColor3f(0.2, 0.2, 0.2);
+	//	glVertex2i(0,       100);
+	//	glVertex2i(gl.xres, 100);
+	//	glColor3f(0.4, 0.4, 0.4);
+	//	glVertex2i(gl.xres,   0);
+	//	glVertex2i(0,         0);
+	//glEnd();
 
 	//----------------------------
 	//Render the level tile system
@@ -973,7 +964,7 @@ void render(void)
 	//===================================
 	// CHARACTER SPRITE
 	//===================================
-	float h = 100.0;
+	float h = 60.0;
 	float w = h * 0.5;
 	glPushMatrix();
 	glTranslated(gl.mainChar.pos[0],gl.mainChar.pos[1], 0);
@@ -1008,8 +999,8 @@ void render(void)
 	glPopMatrix();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
-	//
-	//
+	//======================================================================
+	//Explosions
 	if (gl.exp.onoff) {
 		h = 80.0;
 		w = 80.0;
@@ -1060,21 +1051,18 @@ void render(void)
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glDisable(GL_ALPHA_TEST);
 	}
+	//==========================================================================
 	unsigned int c = 0x00ffff44;
 	r.bot = gl.yres - 20;
 	r.left = gl.xres-100;
 	r.center = 0;
-	//ggprint8b(&r, 16, c, "E   Explosion");
-	//ggprint8b(&r, 16, c, "+   faster");
-	//ggprint8b(&r, 16, c, "-   slower");
-	//ggprint8b(&r, 16, c, "right arrow -> walk right");
-	//ggprint8b(&r, 16, c, "left arrow  <- walk left");
 	ggprint8b(&r, 16, c, "frame: %i", gl.walkFrame);
 	if (gl.movie) {
 		screenCapture();
 	}
 	}
-	//check for startup state
+	//=========================================================================
+	//STARTUP STATE
 	if (gl.state == STATE_STARTUP) {
 	    	int h = gl.yres;
 		int w = gl.xres;			
