@@ -813,12 +813,14 @@ void physics(void)
 		gl.mainChar.pos[1] = 136.0;
 		gl.mainChar.vel[1] = 0.0;
 		gl.mainChar.onGround = true;
+	} else if (gl.mainChar.pos[1] <= h && gl.mainChar.pos[1] > h-32) {
+		gl.mainChar.vel[1] = 0.0;
 	}
-	else if (gl.mainChar.pos[1] <= h+72) {
+	else if (gl.mainChar.pos[1] <= h+72 && gl.mainChar.pos[1] > h) {
 		gl.mainChar.pos[1] = h+72;
 		gl.mainChar.vel[1] = 0.0;
 		gl.mainChar.onGround = true;
-	}
+	} 
 	//=================================================================================
 }
 
