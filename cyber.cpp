@@ -809,16 +809,16 @@ void physics(void)
     	gl.mainChar.vel[1] += GRAVITY;
 	gl.mainChar.pos[1] += gl.mainChar.vel[1];
 	gl.mainChar.pos[0] += gl.mainChar.vel[0];
-	if (gl.mainChar.pos[1] < 0.0) {
-		gl.mainChar.pos[1] = 0.0;
+	if (gl.mainChar.pos[1] < 136) {
+		gl.mainChar.pos[1] = 136.0;
 		gl.mainChar.vel[1] = 0.0;
 		gl.mainChar.onGround = true;
 	}
-	// else if (gl.mainChar.pos[1] <= h) {
-	//	gl.mainChar.pos[1] = h;
-	//	gl.mainChar.vel[1] = 0.0;
-	//	gl.mainChar.onGround = true;
-	//}	    
+	else if (gl.mainChar.pos[1] <= h+72) {
+		gl.mainChar.pos[1] = h+72;
+		gl.mainChar.vel[1] = 0.0;
+		gl.mainChar.onGround = true;
+	}
 	//=================================================================================
 }
 
@@ -878,7 +878,7 @@ void render(void)
 	glClear(GL_COLOR_BUFFER_BIT);
 	renderBackground();
 	float cx = gl.xres/4.0;
-	float cy = (gl.yres/4.0)-37.0; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
+	float cy = (gl.yres/gl.yres)-37.0; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
 	//
 	//show ground
 	//glBegin(GL_QUADS);
