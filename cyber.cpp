@@ -115,6 +115,7 @@ enum State {
 	STATE_NONE,
 	STATE_STARTUP,
 	STATE_GAMEPLAY,
+	STATE_PAUSE,
 	STATE_GAMEOVER
 };
 
@@ -266,8 +267,15 @@ int main(void)
 			gl.yc[0] = 0.0;
 			gl.xc[1] = 1.0;
 			gl.yc[1] = 1.0;
-		}	
-		physics();
+			gl.camera[0] = 0.0;
+			gl.camera[1] = 0.0;
+			gl.mainChar.pos[0] = 0.0;
+			gl.mainChar.pos[1] = 0.0;
+			gl.mainChar.health = 20.0;
+		}
+		if(gl.state == STATE_GAMEPLAY) {	
+			physics();
+		}
 		render();
 		glXSwapBuffers(dpy, win);
 	}
@@ -615,16 +623,27 @@ void checkKeys(XEvent *e)
 	switch (key) {
 	    	case XK_p:
 		    	if (gl.state == STATE_GAMEPLAY) {
-			    gl.state = STATE_STARTUP;
+			    gl.state = STATE_PAUSE;
 			    break;
 			}
-		    	gl.state = STATE_GAMEPLAY;
+			if (gl.state == STATE_STARTUP) {
+		    	    gl.state = STATE_GAMEPLAY;
+			    break;
+			}
 		    	break;
+		case XK_r:
+			if (gl.state == STATE_PAUSE) {
+			    gl.state = STATE_GAMEPLAY;
+			    break;
+			}
+			break;
 		case XK_s:
 			screenCapture();
 			break;
 		case XK_m:
-			gl.movie ^= 1;
+			if (gl.state == STATE_PAUSE) {
+			    gl.state = STATE_STARTUP;
+			}
 			break;
 		case XK_w:
 			timers.recordTime(&timers.walkTime);
@@ -1108,6 +1127,36 @@ void render(void)
 		r.left = gl.xres/2 - 100;
 		ggprint16(&r, 16, c, "PLAY");
 		ggprint16(&r, 16, c, "CREDITS");
+
+	
+	}
+	//===========================================================================
+	//PAUSE SCREEN
+	if (gl.state == STATE_PAUSE) {
+	    	int h = 100.0;
+		int w = 200.0;;			
+		Rect r;
+		glPushMatrix();
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glColor4f(0.58,0.58,0.72,0.8);
+		glTranslated(gl.xres/2, gl.yres/2, 0);
+		glBegin(GL_QUADS);
+			glVertex2i(-w, -h);
+			glVertex2i(-w,  h);
+			glVertex2i(w,   h);
+			glVertex2i(w,  -h);
+		glEnd();
+		glDisable(GL_BLEND);
+		glPopMatrix();
+		r.bot = gl.yres/2 + 80;
+		r.left = gl.xres/2;
+		r.center = 1;
+		ggprint8b(&r, 16, 0, "PAUSE SCREEN");
+		r.center = 0;
+		r.left = gl.xres/2 - 100;
+		ggprint8b(&r, 16, 0, "M - Main Menu");
+		ggprint8b(&r, 16, 0, "R - Resume");
 
 	
 	}
