@@ -726,7 +726,7 @@ void physics(void)
 		//when time is up, advance the frame.
 		timers.recordTime(&timers.timeCurrent);
 		double timeSpan = timers.timeDiff(&timers.walkTime, &timers.timeCurrent);
-		if (timeSpan > gl.delay) {
+		if (timeSpan > 0.15) { //gameDelay orig
 			//advance
 			++gl.walkFrame;
 			if (gl.walkFrame >= 16)
@@ -986,7 +986,7 @@ void render(void)
 	// CHARACTER SPRITE
 	//===================================
 	float h = 60.0;
-	float w = h * 0.5;
+	float w = h * .8;
 	glPushMatrix();
 	glTranslated(gl.mainChar.pos[0],gl.mainChar.pos[1], 0);
 	glColor3f(1.0, 1.0, 1.0);
@@ -995,11 +995,11 @@ void render(void)
 	glEnable(GL_ALPHA_TEST);
 	glAlphaFunc(GL_GREATER, 0.0f);
 	glColor4ub(255,255,255,255);
-	int ix = gl.walkFrame % 8;
+	int ix = gl.walkFrame % 16; //8.0
 	int iy = 0;
-	if (gl.walkFrame >= 8)
+	if (gl.walkFrame >= 4) //8.0
 		iy = 1;
-	float tx = (float)ix / 8.0;
+	float tx = (float)ix / 4.0; //8.0 orig
 	float ty = (float)iy / 2.0;
 	int rgt = 1;
 	if (gl.keys[XK_Left])
@@ -1008,11 +1008,11 @@ void render(void)
 		if (rgt) {
 			glTexCoord2f(tx,      ty+.5); glVertex2i(cx-w, cy-h);
 			glTexCoord2f(tx,      ty);    glVertex2i(cx-w, cy+h);
-			glTexCoord2f(tx+.125, ty);    glVertex2i(cx+w, cy+h);
-			glTexCoord2f(tx+.125, ty+.5); glVertex2i(cx+w, cy-h);
+			glTexCoord2f(tx+.250, ty);    glVertex2i(cx+w, cy+h); //tx+.125 orig
+			glTexCoord2f(tx+.250, ty+.5); glVertex2i(cx+w, cy-h);
 		} else {
-			glTexCoord2f(tx+.125, ty+.5); glVertex2i(cx-w, cy-h);
-			glTexCoord2f(tx+.125, ty);    glVertex2i(cx-w, cy+h);
+			glTexCoord2f(tx+.250, ty+.5); glVertex2i(cx-w, cy-h);
+			glTexCoord2f(tx+.250, ty);    glVertex2i(cx-w, cy+h);
 			glTexCoord2f(tx,      ty);    glVertex2i(cx+w, cy+h);
 			glTexCoord2f(tx,      ty+.5); glVertex2i(cx+w, cy-h);
 		}
