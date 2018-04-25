@@ -183,6 +183,7 @@ public:
 	Ppmimage *cyberstreetImage;
 	Ppmimage *floorImage;
 	Ppmimage *platformImage;
+	Ppmimage *enemyImage;
 	//---------------------------
 	//TEXTURES
 	//GLuint walkTexture;
@@ -190,6 +191,7 @@ public:
 	GLuint cyberstreetTexture;
 	GLuint floorTexture;
 	GLuint platformTexture;
+	GLuint enemyTexture;
 	//---------------------------
 	~Global() {
 		delete [] bullets;
@@ -224,6 +226,7 @@ public:
 		cyberstreetImage=NULL;
 		floorImage=NULL;
 		platformImage=NULL;
+		enemyImage=NULL;
 		//
 		delay = 0.05;
 		exp.onoff=0;
@@ -457,6 +460,7 @@ void initOpengl(void)
 	system("convert ./images/cyberstreet.png ./images/cyberstreet.ppm");
 	system("convert ./images/floor.png ./images/floor.ppm");
 	system("convert ./images/platform.png ./images/platform.ppm");
+	system("convert ./images/enemy.gif ./images/enemy.ppm");
 	//=========================
 	// Get Images
 	//======================================
@@ -464,12 +468,14 @@ void initOpengl(void)
 	gl.cyberstreetImage = ppm6GetImage("./images/cyberstreet.ppm");
 	gl.floorImage = ppm6GetImage("./images/floor.ppm");
 	gl.platformImage = ppm6GetImage("./images/platform.ppm");
+	gl.platformImage = ppm6GetImage("./images/enemy.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
 	glGenTextures(1, &gl.cyberstreetTexture);
 	glGenTextures(1, &gl.floorTexture);
 	glGenTextures(1, &gl.platformTexture);
+	glGenTextures(1, &gl.enemyTexture);
 	//======================================
 
 
@@ -588,6 +594,18 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, platformData);
 	free(platformData);
 	unlink("./images/platform.ppm");
+	//------------------------------------------------------
+	//Enemy Texture
+	w = gl.enemyImage->width;
+	h = gl.enemyImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.enemyTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *enemyData = buildAlphaData(gl.enemyImage);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, enemyData);
+	free(enemyData);
+	unlink("./images/enemy.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -922,7 +940,9 @@ void tileCollision(Vec *tile) {
 	//	gl.collisionL = 0;
 	//}
 }
+void renderEnemy() {
 
+}
 void bulletPhysics() {
 	for (int i = 0; i < gl.nbullets; i++) {
 		glPushMatrix();
