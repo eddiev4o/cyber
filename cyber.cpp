@@ -58,6 +58,10 @@ void healthBar(void);
 void renderBackground(void);
 void StartJump(void);
 void EndJump(void);
+void bullets(void);
+void bulletPhysics(void);
+void shootbullets(void);
+void showHitbox(float, float, float, float);
 void tileCollision(Vec *tile);
 //-----------------------------------------------------------------------------
 //Setup timers
@@ -97,9 +101,15 @@ class Bullet {
 public:
 	Vec pos;
 	Vec vel;
+	int direction;
+	float velocity;
 	float color[3];
 	struct timespec time;
-	Bullet () {}
+	Bullet () {	
+	    direction = 0;
+	    pos[0] = 0;
+	    pos[1] = 0;
+	}
 };
 
 class Sprite {
@@ -161,9 +171,13 @@ public:
 	int collisionL;
 	int collisionR;
 	//Bullets
-	Bullet *barr;
+	Bullet *bullets;
 	int nbullets;
+	float bulletVelocity;
 	struct timespec bulletTimer;		
+	float bulletWidth;
+	float bulletHeight;
+	int direction;
 	//PPM IMAGES
 	Ppmimage *cyberMenuImage;
 	Ppmimage *cyberstreetImage;
@@ -178,7 +192,7 @@ public:
 	GLuint platformTexture;
 	//---------------------------
 	~Global() {
-		delete [] barr;
+		delete [] bullets;
 		logClose();
 	}
 	Global() {
@@ -197,6 +211,7 @@ public:
 		xres=1000;
 		yres=600;
 		walk=0;
+		direction=1;
 		httpFrame=0;
 		walkFrame=0;
 		jumpFrame=0;
@@ -227,8 +242,11 @@ public:
 		mainChar.health = 20.0;
 		memset(keys, 0, 65536);
 		//Bullets
-		barr = new Bullet[MAX_BULLETS];
+		bullets = new Bullet[MAX_BULLETS];
+		bulletVelocity = 10;
 		nbullets = 0;
+		bulletWidth = 4;
+		bulletHeight = 2;
 		clock_gettime(CLOCK_REALTIME, &bulletTimer);
 	}
 } gl;
@@ -732,6 +750,7 @@ void checkKeys(XEvent *e)
 			gl.exp44.onoff ^= 1;
 			break;
 		case XK_space:
+			bullets();
 			break;
 		case XK_Left:
 			break;
@@ -809,12 +828,14 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] -= 0.00002;
 			gl.xc[1] -= 0.00002;
+			gl.bullets->direction = 1;
 		} else if (gl.keys[XK_Right] && gl.collision == 0) {
 			gl.camera[0] += 2.0/lev.tilesize[0] * (1.0 / gl.delay);
 			if (gl.camera[0] < 0.0)
-				gl.camera[0] = 0.0;
+		gl.camera[0] = 0.0;
 			gl.xc[0] += 0.0002;
 			gl.xc[1] += 0.0002;
+			gl.bullets->direction = 0;
 		}
 		if (gl.exp.onoff) {
 			gl.exp.pos[0] -= 2.0 * (0.05 / gl.delay);
@@ -902,6 +923,45 @@ void tileCollision(Vec *tile) {
 	//}
 }
 
+void bulletPhysics() {
+	for (int i = 0; i < gl.nbullets; i++) {
+		glPushMatrix();
+		glColor3f(1.0,1.0,1.0);
+		glTranslatef(gl.bullets[i].pos[0], gl.bullets[i].pos[1], 0);
+		float w = gl.bulletWidth;	
+		float h = gl.bulletHeight;
+		glBegin(GL_QUADS);
+			glVertex2i(-w, -h);	
+			glVertex2i(-w, h);	
+			glVertex2i(w, h);	
+			glVertex2i(w, -h);
+		glEnd();
+		glPopMatrix();
+		if (gl.bullets[i].direction == 1) {
+			gl.bullets[i].pos[0] = gl.bullets[i].pos[0] - gl.bullets[i].velocity;
+		}	
+		if (gl.bullets[i].direction == 0) {
+			gl.bullets[i].pos[0] = gl.bullets[i].pos[0] + gl.bullets[i].velocity;
+		}
+		if (gl.bullets[i].pos[0] < 0 || gl.bullets[i].pos[0] > gl.xres) {
+			gl.bullets[i] = gl.bullets[gl.nbullets - 1];
+			gl.nbullets--;
+		}	
+	}
+}
+void bullets() {
+	if (gl.direction == 1) {
+		gl.bullets[gl.nbullets].pos[0] = gl.mainChar.pos[0]+290;
+	}
+	if (gl.direction == 0) {
+		gl.bullets[gl.nbullets].pos[0] = gl.mainChar.pos[0]+200;
+	}
+	gl.bullets[gl.nbullets].pos[1] = gl.mainChar.pos[1]-30;
+	gl.bullets[gl.nbullets].velocity = gl.bulletVelocity;
+	gl.bullets[gl.nbullets].direction = gl.bullets->direction;
+	gl.nbullets++;
+	printf("bullet made\n");
+}
 void healthBar()
 {
 	Rect r;
@@ -932,6 +992,22 @@ void healthBar()
                         glEnd();
                 glPopMatrix();
         }	
+}
+
+void showHitbox(float cx, float cy, float height, float width) 
+{
+	float w = width;
+	float h = height;
+	glPushMatrix();
+	glColor3f(1.0, 0.0, 0.0);
+	glTranslated(gl.mainChar.pos[0], gl.mainChar.pos[1], 0);
+	glBegin(GL_LINE_LOOP);
+		glVertex2i(cx-w, cy-h);
+		glVertex2i(cx-w, cy+h);
+		glVertex2i(cx+w, cy+h);
+		glVertex2i(cx+w, cy-h);
+	glEnd();
+	glPopMatrix();
 }
 void renderBackground()
 {
@@ -1046,6 +1122,7 @@ void render(void)
 	glPopMatrix();
 	//===================================
 	healthBar();
+	bulletPhysics();
 	//===================================
 	// CHARACTER SPRITE
 	//===================================
@@ -1065,11 +1142,12 @@ void render(void)
 		iy = 1;
 	float tx = (float)ix / 4.0; //8.0 orig
 	float ty = (float)iy / 2.0;
-	int rgt = 1;
+	if (gl.keys[XK_Right])
+		gl.direction=1;
 	if (gl.keys[XK_Left])
-		rgt=0;
+		gl.direction=0;
 	glBegin(GL_QUADS);
-		if (rgt) {
+		if (gl.direction) {
 			glTexCoord2f(tx,      ty+.5); glVertex2i(cx-w, cy-h);
 			glTexCoord2f(tx,      ty);    glVertex2i(cx-w, cy+h);
 			glTexCoord2f(tx+.250, ty);    glVertex2i(cx+w, cy+h); //tx+.125 orig
@@ -1084,6 +1162,7 @@ void render(void)
 	glPopMatrix();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
+	showHitbox(cx, cy, h, w);
 	//======================================================================
 	//Explosions
 	if (gl.exp.onoff) {
