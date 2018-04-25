@@ -36,6 +36,7 @@ typedef Flt	Matrix[4][4];
 //constants
 const float timeslice = 1.0f;
 const float gravity = -0.2f;
+const int MAX_BULLETS = 11;
 #define ALPHA 1
 #define GRAVITY -0.5f
 //X Windows variables
@@ -57,6 +58,7 @@ void healthBar(void);
 void renderBackground(void);
 void StartJump(void);
 void EndJump(void);
+void tileCollision(Vec *tile);
 //-----------------------------------------------------------------------------
 //Setup timers
 class Timers {
@@ -91,6 +93,15 @@ struct Shape {
         Vec center;
 };
 
+class Bullet {
+public:
+	Vec pos;
+	Vec vel;
+	float color[3];
+	struct timespec time;
+	Bullet () {}
+};
+
 class Sprite {
 public:
 	int onoff;
@@ -98,6 +109,8 @@ public:
 	double delay;
 	Vec pos;
 	Vec vel;
+	float spritex;
+	float spritey;
 	bool onGround;
 	float health;
 	Ppmimage *image;
@@ -143,22 +156,36 @@ public:
 	Vec ball_pos;
 	Vec ball_vel;
 	Flt xc[2];
-	Flt yc[2];		
+	Flt yc[2];
+	int collision;
+	int collisionL;
+	int collisionR;
+	//Bullets
+	Bullet *barr;
+	int nbullets;
+	struct timespec bulletTimer;		
 	//PPM IMAGES
-	//Ppmimage *walkImage;
 	Ppmimage *cyberMenuImage;
 	Ppmimage *cyberstreetImage;
+	Ppmimage *floorImage;
+	Ppmimage *platformImage;
 	//---------------------------
 	//TEXTURES
 	//GLuint walkTexture;
 	GLuint cyberMenuTexture;
 	GLuint cyberstreetTexture;
+	GLuint floorTexture;
+	GLuint platformTexture;
 	//---------------------------
 	~Global() {
+		delete [] barr;
 		logClose();
 	}
 	Global() {
 		logOpen();
+		collision = 0;
+		collisionR = 0;
+		collisionL = 0;
 		state = STATE_STARTUP;
 		camera[0] = camera[1] = 0.0;
 		ball_pos[0] = 500.0;
@@ -176,9 +203,13 @@ public:
 		jumpFlag=0;
 		jumpDelay=0.10;
 		jumpHt = 200.0;
+		//image variables
 		mainChar.image=NULL;
 		cyberMenuImage=NULL;
 		cyberstreetImage=NULL;
+		floorImage=NULL;
+		platformImage=NULL;
+		//
 		delay = 0.05;
 		exp.onoff=0;
 		exp.frame=0;
@@ -195,6 +226,10 @@ public:
 		mainChar.onGround = false;
 		mainChar.health = 20.0;
 		memset(keys, 0, 65536);
+		//Bullets
+		barr = new Bullet[MAX_BULLETS];
+		nbullets = 0;
+		clock_gettime(CLOCK_REALTIME, &bulletTimer);
 	}
 } gl;
 
@@ -395,19 +430,28 @@ void initOpengl(void)
 	//Do this to allow fonts
 	glEnable(GL_TEXTURE_2D);
 	initialize_fonts();
+
+
+
 	//=====================================
 	// Convert Images
 	system("convert ./images/cyberMenu.png ./images/cyberMenu.ppm");
 	system("convert ./images/cyberstreet.png ./images/cyberstreet.ppm");
+	system("convert ./images/floor.png ./images/floor.ppm");
+	system("convert ./images/platform.png ./images/platform.ppm");
 	//=========================
 	// Get Images
 	//======================================
 	gl.cyberMenuImage = ppm6GetImage("./images/cyberMenu.ppm");
 	gl.cyberstreetImage = ppm6GetImage("./images/cyberstreet.ppm");
+	gl.floorImage = ppm6GetImage("./images/floor.ppm");
+	gl.platformImage = ppm6GetImage("./images/platform.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
 	glGenTextures(1, &gl.cyberstreetTexture);
+	glGenTextures(1, &gl.floorTexture);
+	glGenTextures(1, &gl.platformTexture);
 	//======================================
 
 
@@ -502,6 +546,30 @@ void initOpengl(void)
 	gl.xc[1] = 1.0;
 	gl.yc[0] = 0.0;
 	gl.yc[1] = 1.0;
+	//------------------------------------------------------
+	//Floor Texture
+	w = gl.floorImage->width;
+	h = gl.floorImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.floorTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *floorData = buildAlphaData(gl.floorImage);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, floorData);
+	free(floorData);
+	unlink("./images/floor.ppm");
+	//------------------------------------------------------
+	//Platform Texture
+	w = gl.platformImage->width;
+	h = gl.platformImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.platformTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *platformData = buildAlphaData(gl.platformImage);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, platformData);
+	free(platformData);
+	unlink("./images/platform.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -663,6 +731,8 @@ void checkKeys(XEvent *e)
 			timers.recordTime(&gl.exp44.time);
 			gl.exp44.onoff ^= 1;
 			break;
+		case XK_space:
+			break;
 		case XK_Left:
 			break;
 		case XK_Right:
@@ -733,13 +803,13 @@ void physics(void)
 				gl.walkFrame -= 16;
 			timers.recordTime(&timers.walkTime);
 		}
-		if (gl.keys[XK_Left]) {
+		if (gl.keys[XK_Left] && gl.collision == 0) {
 			gl.camera[0] -= 2.0/lev.tilesize[0] * (1.0 / gl.delay);
 			if (gl.camera[0] < 0.0)
 				gl.camera[0] = 0.0;
 			gl.xc[0] -= 0.00002;
 			gl.xc[1] -= 0.00002;
-		} else if (gl.keys[XK_Right]) {
+		} else if (gl.keys[XK_Right] && gl.collision == 0) {
 			gl.camera[0] += 2.0/lev.tilesize[0] * (1.0 / gl.delay);
 			if (gl.camera[0] < 0.0)
 				gl.camera[0] = 0.0;
@@ -753,41 +823,10 @@ void physics(void)
 			gl.exp44.pos[0] -= 2.0 * (0.05 / gl.delay);
 		}
 	}
-	if (gl.exp.onoff) {
-		//explosion is happening
-		timers.recordTime(&timers.timeCurrent);
-		double timeSpan = timers.timeDiff(&gl.exp.time, &timers.timeCurrent);
-		if (timeSpan > gl.exp.delay) {
-			//advance explosion frame
-			++gl.exp.frame;
-			if (gl.exp.frame >= 23) {
-				//explosion is done.
-				gl.exp.onoff = 0;
-				gl.exp.frame = 0;
-			} else {
-				timers.recordTime(&gl.exp.time);
-			}
-		}
-	}
-	if (gl.exp44.onoff) {
-		//explosion is happening
-		timers.recordTime(&timers.timeCurrent);
-		double timeSpan = timers.timeDiff(&gl.exp44.time, &timers.timeCurrent);
-		if (timeSpan > gl.exp44.delay) {
-			//advance explosion frame
-			++gl.exp44.frame;
-			if (gl.exp44.frame >= 16) {
-				//explosion is done.
-				gl.exp44.onoff = 0;
-				gl.exp44.frame = 0;
-			} else {
-				timers.recordTime(&gl.exp44.time);
-			}
-		}
-	}
 	//move the ball
 	gl.ball_pos[1] += gl.ball_vel[1];
 	gl.ball_vel[1] -= 1.0;
+	//=================================================
 	//=================================================
 	//Height Calculation
 	Flt dd = lev.ftsz[0];
@@ -816,13 +855,13 @@ void physics(void)
 	}
 	//height of ball is (nrows-1-i)*tile_height + starting point.
 	Flt h = lev.tilesize[1] * (lev.nrows-hgt) + lev.tile_base;
-	printf("%f\n", h);
 	if (gl.ball_pos[1] <= h) {
 	    gl.ball_vel[1] = 0.0;
 	    gl.ball_pos[1] = h;
 	}
 	//End of height calculation
 	//==================================================
+	
 	//================================================================================
 	//JUMP PHYSICS
     	gl.mainChar.vel[1] += GRAVITY;
@@ -839,14 +878,34 @@ void physics(void)
 		gl.mainChar.pos[1] = h+72;
 		gl.mainChar.vel[1] = 0.0;
 		gl.mainChar.onGround = true;
-	} 
+	}
 	//=================================================================================
+	// Shooting
+}
+
+void tileCollision(Vec *tile) {
+	//if ((gl.camera[0] >= *tile[0]) && (gl.camera[0] <= (*tile[0])) && gl.keys[XK_Right]) {
+	//	gl.collision = 1;
+	//	gl.collisionR = 1;
+	//}
+	//else if (gl.keys[XK_Left] && gl.collisionR == 1) {
+	//	gl.collision = 0;
+	//	gl.collisionR = 0;
+	//}
+	//if ((gl.camera[0] >= *tile[0]) && (gl.camera[0] <= (*tile[0])) && gl.keys[XK_Left]) {
+	//	gl.collision = 1;
+	//	gl.collisionL = 1;
+	//}
+	//else if (gl.keys[XK_Right] && gl.collisionL == 1) {
+	//	gl.collision = 0;
+	//	gl.collisionL = 0;
+	//}
 }
 
 void healthBar()
 {
 	Rect r;
-        unsigned int c = 0x008b00;
+        unsigned int c = 0xa30000;
         r.bot = gl.yres-30;
         r.left = (gl.xres/gl.xres) + 20;
         r.center = 0;
@@ -936,32 +995,37 @@ void render(void)
 			if (lev.arr[row][col] == 'w') {
 				glColor3f(0.8, 0.8, 0.6);
 				glPushMatrix();
+				glBindTexture(GL_TEXTURE_2D, gl.floorTexture);
 				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
 				glTranslated(tr[0],tr[1],tr[2]);
 				int tx = lev.tilesize[0];
 				int ty = lev.tilesize[1];
 				glBegin(GL_QUADS);
-					glVertex2i( 0,  0);
-					glVertex2i( 0, ty);
-					glVertex2i(tx, ty);
-					glVertex2i(tx,  0);
+					glTexCoord2f(0.0, 1.0); glVertex2i( 0,  0);
+					glTexCoord2f(0.0, 0.0); glVertex2i( 0, ty);
+					glTexCoord2f(1.0, 0.0); glVertex2i(tx, ty);
+					glTexCoord2f(1.0, 1.0); glVertex2i(tx,  0);
 				glEnd();
 				glPopMatrix();
+				glBindTexture(GL_TEXTURE_2D, 0);
 			}
 			if (lev.arr[row][col] == 'b') {
 				glColor3f(0.9, 0.2, 0.2);
 				glPushMatrix();
+				glBindTexture(GL_TEXTURE_2D, gl.platformTexture);
 				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
+				tileCollision(&tr);
 				glTranslated(tr[0],tr[1],tr[2]);
 				int tx = lev.tilesize[0];
 				int ty = lev.tilesize[1];
 				glBegin(GL_QUADS);
-					glVertex2i( 0,  0);
-					glVertex2i( 0, ty);
-					glVertex2i(tx, ty);
-					glVertex2i(tx,  0);
+					glTexCoord2f(0.0, 1.0); glVertex2i( 0,  0);
+					glTexCoord2f(0.0, 0.0); glVertex2i( 0, ty);
+					glTexCoord2f(1.0, 0.0); glVertex2i(tx, ty);
+					glTexCoord2f(1.0, 1.0); glVertex2i(tx,  0);
 				glEnd();
 				glPopMatrix();
+				glBindTexture(GL_TEXTURE_2D, 0);
 			}
 			--row;
 		}
