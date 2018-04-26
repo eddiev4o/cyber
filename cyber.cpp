@@ -36,7 +36,7 @@ typedef Flt	Matrix[4][4];
 //constants
 const float timeslice = 1.0f;
 const float gravity = -0.2f;
-const int MAX_BULLETS = 11;
+const int MAX_BULLETS = 100;
 #define ALPHA 1
 #define GRAVITY -0.5f
 //X Windows variables
@@ -60,9 +60,11 @@ void StartJump(void);
 void EndJump(void);
 void bullets(void);
 void bulletPhysics(void);
+void enemyPhysics(void);
 void shootbullets(void);
-void showHitbox(float, float, float, float);
-void tileCollision(Vec *tile);
+void showHitbox(float, float, float, float, double, double);
+void enemyHealthBar(float, float, double, double);
+//void tileCollision(Vec *tile);
 //-----------------------------------------------------------------------------
 //Setup timers
 class Timers {
@@ -71,6 +73,7 @@ public:
 	double oobillion;
 	struct timespec timeStart, timeEnd, timeCurrent;
 	struct timespec walkTime;
+	struct timespec enemyTime;
 	struct timespec jumpTime;
 	struct timespec httpTime;
 	Timers() {
@@ -151,16 +154,12 @@ public:
 	int movie, movieStep;
 	int walk;
 	int walkFrame;
-	int jumpFrame;
-	int jumpFlag;
-	double jumpDelay;
-	double jumpHt;
+	int enemyFrame;
 	int httpFrame;
 	double delay;
 	Vec box[20];
-	Sprite exp;
-	Sprite exp44;
 	Sprite mainChar;
+	Sprite enemyChar;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
 	Vec ball_pos;
@@ -178,6 +177,7 @@ public:
 	float bulletWidth;
 	float bulletHeight;
 	int direction;
+	int enemyDirection;
 	//PPM IMAGES
 	Ppmimage *cyberMenuImage;
 	Ppmimage *cyberstreetImage;
@@ -214,12 +214,10 @@ public:
 		yres=600;
 		walk=0;
 		direction=1;
+		enemyDirection=1;
 		httpFrame=0;
 		walkFrame=0;
-		jumpFrame=0;
-		jumpFlag=0;
-		jumpDelay=0.10;
-		jumpHt = 200.0;
+		enemyFrame=0;
 		//image variables
 		mainChar.image=NULL;
 		cyberMenuImage=NULL;
@@ -229,20 +227,18 @@ public:
 		enemyImage=NULL;
 		//
 		delay = 0.05;
-		exp.onoff=0;
-		exp.frame=0;
-		exp.image=NULL;
-		exp.delay = 0.02;
-		exp44.onoff=0;
-		exp44.frame=0;
-		exp44.image=NULL;
-		exp44.delay = 0.022;
 		mainChar.pos[1] = 0.0;
 		mainChar.pos[2] = 0.0;
 		mainChar.vel[0] = 0.0;
 		mainChar.vel[1] = 0.0;
 		mainChar.onGround = false;
 		mainChar.health = 20.0;
+		enemyChar.pos[0] = 0.0;
+		enemyChar.pos[1] = 0.0;
+		enemyChar.vel[0] = 0.0;
+		enemyChar.vel[1] = 0.0;
+		enemyChar.onGround = false;
+		enemyChar.health = 10.0;
 		memset(keys, 0, 65536);
 		//Bullets
 		bullets = new Bullet[MAX_BULLETS];
@@ -328,9 +324,13 @@ int main(void)
 			gl.mainChar.pos[0] = 0.0;
 			gl.mainChar.pos[1] = 0.0;
 			gl.mainChar.health = 20.0;
+			gl.enemyChar.pos[0] = 500;
+			gl.enemyChar.pos[1] = 0.0;
+			gl.enemyChar.health = 10.0;
 		}
 		if(gl.state == STATE_GAMEPLAY) {	
 			physics();
+			enemyPhysics();
 		}
 		render();
 		glXSwapBuffers(dpy, win);
@@ -468,7 +468,7 @@ void initOpengl(void)
 	gl.cyberstreetImage = ppm6GetImage("./images/cyberstreet.ppm");
 	gl.floorImage = ppm6GetImage("./images/floor.ppm");
 	gl.platformImage = ppm6GetImage("./images/platform.ppm");
-	gl.platformImage = ppm6GetImage("./images/enemy.ppm");
+	gl.enemyImage = ppm6GetImage("./images/enemy.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
@@ -507,42 +507,6 @@ void initOpengl(void)
 	free(walkData);
 	unlink("./images/walk.ppm");
 	//-------------------------------------------------------------------------
-	system("convert ./images/exp.png ./images/exp.ppm");
-	gl.exp.image = ppm6GetImage("./images/exp.ppm");
-	w = gl.exp.image->width;
-	h = gl.exp.image->height;
-	//create opengl texture elements
-	glGenTextures(1, &gl.exp.tex);
-	//-------------------------------------------------------------------------
-	//this is similar to a sprite graphic
-	glBindTexture(GL_TEXTURE_2D, gl.exp.tex);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-	//must build a new set of data...
-	unsigned char *xData = buildAlphaData(gl.exp.image);	
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
-		GL_RGBA, GL_UNSIGNED_BYTE, xData);
-	free(xData);
-	unlink("./images/exp.ppm");
-	//-------------------------------------------------------------------------
-	system("convert ./images/exp44.png ./images/exp44.ppm");
-	gl.exp44.image = ppm6GetImage("./images/exp44.ppm");
-	w = gl.exp44.image->width;
-	h = gl.exp44.image->height;
-	//create opengl texture elements
-	glGenTextures(1, &gl.exp44.tex);
-	//-------------------------------------------------------------------------
-	//this is similar to a sprite graphic
-	glBindTexture(GL_TEXTURE_2D, gl.exp44.tex);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-	//must build a new set of data...
-	xData = buildAlphaData(gl.exp44.image);	
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
-		GL_RGBA, GL_UNSIGNED_BYTE, xData);
-	free(xData);
-	unlink("./images/exp44.ppm");
-	//------------------------------------------------------
 	//Cyber Menu Logo
 	w = gl.cyberMenuImage->width;
 	h = gl.cyberMenuImage->height;
@@ -754,18 +718,8 @@ void checkKeys(XEvent *e)
 			gl.walk ^= 1;
 			break;
 		case XK_e:
-			gl.exp.pos[0] = 200.0;
-			gl.exp.pos[1] = -60.0;
-			gl.exp.pos[2] =   0.0;
-			timers.recordTime(&gl.exp.time);
-			gl.exp.onoff ^= 1;
 			break;
 		case XK_f:
-			gl.exp44.pos[0] = 200.0;
-			gl.exp44.pos[1] = -60.0;
-			gl.exp44.pos[2] =   0.0;
-			timers.recordTime(&gl.exp44.time);
-			gl.exp44.onoff ^= 1;
 			break;
 		case XK_space:
 			bullets();
@@ -846,20 +800,16 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] -= 0.00002;
 			gl.xc[1] -= 0.00002;
+			gl.enemyChar.pos[0] += 1.25;
 			gl.bullets->direction = 1;
 		} else if (gl.keys[XK_Right] && gl.collision == 0) {
 			gl.camera[0] += 2.0/lev.tilesize[0] * (1.0 / gl.delay);
 			if (gl.camera[0] < 0.0)
-		gl.camera[0] = 0.0;
+				gl.camera[0] = 0.0;
 			gl.xc[0] += 0.0002;
 			gl.xc[1] += 0.0002;
+			gl.enemyChar.pos[0] -= 1.25;
 			gl.bullets->direction = 0;
-		}
-		if (gl.exp.onoff) {
-			gl.exp.pos[0] -= 2.0 * (0.05 / gl.delay);
-		}
-		if (gl.exp44.onoff) {
-			gl.exp44.pos[0] -= 2.0 * (0.05 / gl.delay);
 		}
 	}
 	//move the ball
@@ -922,7 +872,7 @@ void physics(void)
 	// Shooting
 }
 
-void tileCollision(Vec *tile) {
+//void tileCollision(Vec *tile) {
 	//if ((gl.camera[0] >= *tile[0]) && (gl.camera[0] <= (*tile[0])) && gl.keys[XK_Right]) {
 	//	gl.collision = 1;
 	//	gl.collisionR = 1;
@@ -939,10 +889,8 @@ void tileCollision(Vec *tile) {
 	//	gl.collision = 0;
 	//	gl.collisionL = 0;
 	//}
-}
-void renderEnemy() {
+//}
 
-}
 void bulletPhysics() {
 	for (int i = 0; i < gl.nbullets; i++) {
 		glPushMatrix();
@@ -980,8 +928,9 @@ void bullets() {
 	gl.bullets[gl.nbullets].velocity = gl.bulletVelocity;
 	gl.bullets[gl.nbullets].direction = gl.bullets->direction;
 	gl.nbullets++;
-	printf("bullet made\n");
+	//printf("bullet made\n");
 }
+
 void healthBar()
 {
 	Rect r;
@@ -1014,13 +963,13 @@ void healthBar()
         }	
 }
 
-void showHitbox(float cx, float cy, float height, float width) 
+void showHitbox(float cx, float cy, float height, float width, double *pos0, double *pos1) 
 {
 	float w = width;
 	float h = height;
 	glPushMatrix();
 	glColor3f(1.0, 0.0, 0.0);
-	glTranslated(gl.mainChar.pos[0], gl.mainChar.pos[1], 0);
+	glTranslated(*pos0, *pos1, 0);
 	glBegin(GL_LINE_LOOP);
 		glVertex2i(cx-w, cy-h);
 		glVertex2i(cx-w, cy+h);
@@ -1029,6 +978,97 @@ void showHitbox(float cx, float cy, float height, float width)
 	glEnd();
 	glPopMatrix();
 }
+
+void enemyPhysics() {
+	if (gl.state == STATE_GAMEPLAY) {
+		timers.recordTime(&timers.timeCurrent);
+		double timeSpan = timers.timeDiff(&timers.enemyTime, &timers.timeCurrent);
+		if (timeSpan > 0.18) { //gameDelay orig
+		//advance
+		++gl.enemyFrame;
+		printf("EnemyFrame: %i\n", gl.enemyFrame);
+			if (gl.enemyFrame <= 16) {
+				gl.enemyDirection = 1;
+				gl.enemyChar.pos[0] += 16;
+			}
+			if (gl.enemyFrame < 32 && gl.enemyFrame > 16) {
+				gl.enemyDirection = 0;
+				gl.enemyChar.pos[0] -= 16;
+			}
+			if (gl.enemyFrame >= 32) {
+				gl.enemyFrame -= 32;
+			}
+		timers.recordTime(&timers.enemyTime);
+		}
+	}
+}
+
+void enemyHealthBar(float cx, float cy, double *pos0, double *pos1)
+{
+        Shape s;
+        Shape box[200];
+        for (int i = 0; i < gl.enemyChar.health; i++) {
+                box[i].width = 3;
+                box[i].height = 6;
+                box[i].center[0] = *pos0 + (i*6) - 30;
+                box[i].center[1] = *pos1 + 50;
+                box[i].center[2] = 0;
+                s = box[i];
+                glPushMatrix();
+                glColor3ub(8, 146, 208);
+                glTranslatef(s.center[0], s.center[1], s.center[2]);
+                float w = s.width;
+                float h = s.height;
+                glBegin(GL_QUADS);
+                        glVertex2i(cx-w, cy-h);
+                        glVertex2i(cx-w, cy+h);
+                        glVertex2i(cx+w, cy+h);
+                        glVertex2i(cx+w, cy-h);
+                        glEnd();
+                glPopMatrix();
+        }	
+}
+
+void renderEnemy()
+{
+	float cx = gl.xres/4.0;
+	float cy = gl.yres/4 -32; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
+	float h = 60.0;
+	float w = 48.0;
+	glPushMatrix();
+	glTranslated(gl.enemyChar.pos[0],gl.enemyChar.pos[1], 0);
+	glColor3f(1.0, 1.0, 1.0);
+	glBindTexture(GL_TEXTURE_2D, gl.enemyTexture);
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.0f);
+	glColor4ub(255,255,255,255);
+	int ix = gl.enemyFrame % 16; //8.0
+	int iy = 0;
+	if (gl.enemyFrame >= 4) //8.0
+		iy = 1;
+	float tx = (float)ix / 4.0; //8.0 orig
+	float ty = (float)iy / 2.0;
+	glBegin(GL_QUADS);
+		if (gl.enemyDirection) {
+			glTexCoord2f(tx,      ty+.5); glVertex2i(cx-w, cy-h);
+			glTexCoord2f(tx,      ty);    glVertex2i(cx-w, cy+h);
+			glTexCoord2f(tx+.250, ty);    glVertex2i(cx+w, cy+h); //tx+.125 orig
+			glTexCoord2f(tx+.250, ty+.5); glVertex2i(cx+w, cy-h);
+		} else {
+			glTexCoord2f(tx+.250, ty+.5); glVertex2i(cx-w, cy-h);
+			glTexCoord2f(tx+.250, ty);    glVertex2i(cx-w, cy+h);
+			glTexCoord2f(tx,      ty);    glVertex2i(cx+w, cy+h);
+			glTexCoord2f(tx,      ty+.5); glVertex2i(cx+w, cy-h);
+		}
+	glEnd();
+	glPopMatrix();
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDisable(GL_ALPHA_TEST);
+	showHitbox(cx, cy, h, w, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
+	enemyHealthBar(cx, cy, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
+	printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
+}
+
 void renderBackground()
 {
 	glPushMatrix();
@@ -1054,18 +1094,8 @@ void render(void)
 	glClear(GL_COLOR_BUFFER_BIT);
 	renderBackground();
 	float cx = gl.xres/4.0;
-	float cy = (gl.yres/gl.yres)-37.0; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
-	//
-	//show ground
-	//glBegin(GL_QUADS);
-	//	glColor3f(0.2, 0.2, 0.2);
-	//	glVertex2i(0,       100);
-	//	glVertex2i(gl.xres, 100);
-	//	glColor3f(0.4, 0.4, 0.4);
-	//	glVertex2i(gl.xres,   0);
-	//	glVertex2i(0,         0);
-	//glEnd();
-
+	float cy = (gl.yres/gl.yres)-32; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
+	
 	//----------------------------
 	//Render the level tile system
 	//----------------------------
@@ -1110,7 +1140,7 @@ void render(void)
 				glPushMatrix();
 				glBindTexture(GL_TEXTURE_2D, gl.platformTexture);
 				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
-				tileCollision(&tr);
+				//tileCollision(&tr);
 				glTranslated(tr[0],tr[1],tr[2]);
 				int tx = lev.tilesize[0];
 				int ty = lev.tilesize[1];
@@ -1128,21 +1158,23 @@ void render(void)
 		++col;
 		col = col % lev.ncols;
 	}
+
 	//===================================
 	//draw ball
-	glColor3f(1.0, 1.0, 0.0);
-	glPushMatrix();
-	glTranslated(gl.ball_pos[0],gl.ball_pos[1], 0);
-	glBegin(GL_QUADS);
-		glVertex2i( 0,  0);
-		glVertex2i( 0, 10);
-		glVertex2i(10, 10);
-		glVertex2i(10,  0);
-	glEnd();
-	glPopMatrix();
+	//glColor3f(1.0, 1.0, 0.0);
+	//glPushMatrix();
+	//glTranslated(gl.ball_pos[0],gl.ball_pos[1], 0);
+	//glBegin(GL_QUADS);
+	//	glVertex2i( 0,  0);
+	//	glVertex2i( 0, 10);
+	//	glVertex2i(10, 10);
+	//	glVertex2i(10,  0);
+	//glEnd();
+	//glPopMatrix();
 	//===================================
 	healthBar();
 	bulletPhysics();
+
 	//===================================
 	// CHARACTER SPRITE
 	//===================================
@@ -1182,59 +1214,8 @@ void render(void)
 	glPopMatrix();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
-	showHitbox(cx, cy, h, w);
-	//======================================================================
-	//Explosions
-	if (gl.exp.onoff) {
-		h = 80.0;
-		w = 80.0;
-		glPushMatrix();
-		glColor3f(1.0, 1.0, 1.0);
-		glBindTexture(GL_TEXTURE_2D, gl.exp.tex);
-		glEnable(GL_ALPHA_TEST);
-		glAlphaFunc(GL_GREATER, 0.0f);
-		glColor4ub(255,255,255,255);
-		glTranslated(gl.exp.pos[0], gl.exp.pos[1], gl.exp.pos[2]);
-		int ix = gl.exp.frame % 5;
-		int iy = gl.exp.frame / 5;
-		float tx = (float)ix / 5.0;
-		float ty = (float)iy / 5.0;
-		glBegin(GL_QUADS);
-			glTexCoord2f(tx,     ty+0.2); glVertex2i(cx-w, cy-h);
-			glTexCoord2f(tx,     ty);     glVertex2i(cx-w, cy+h);
-			glTexCoord2f(tx+0.2, ty);     glVertex2i(cx+w, cy+h);
-			glTexCoord2f(tx+0.2, ty+0.2); glVertex2i(cx+w, cy-h);
-		glEnd();
-		glPopMatrix();
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glDisable(GL_ALPHA_TEST);
-	}
-	//
-	//
-	if (gl.exp44.onoff) {
-		h = 80.0;
-		w = 80.0;
-		glPushMatrix();
-		glColor3f(1.0, 1.0, 1.0);
-		glBindTexture(GL_TEXTURE_2D, gl.exp44.tex);
-		glEnable(GL_ALPHA_TEST);
-		glAlphaFunc(GL_GREATER, 0.0f);
-		glColor4ub(255,255,255,255);
-		glTranslated(gl.exp44.pos[0], gl.exp44.pos[1], gl.exp44.pos[2]);
-		int ix = gl.exp44.frame % 4;
-		int iy = gl.exp44.frame / 4;
-		float tx = (float)ix / 4.0;
-		float ty = (float)iy / 4.0;
-		glBegin(GL_QUADS);
-			glTexCoord2f(tx,      ty+0.25); glVertex2i(cx-w, cy-h);
-			glTexCoord2f(tx,      ty);      glVertex2i(cx-w, cy+h);
-			glTexCoord2f(tx+0.25, ty);      glVertex2i(cx+w, cy+h);
-			glTexCoord2f(tx+0.25, ty+0.25); glVertex2i(cx+w, cy-h);
-		glEnd();
-		glPopMatrix();
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glDisable(GL_ALPHA_TEST);
-	}
+	showHitbox(cx, cy, h, w, &gl.mainChar.pos[0], &gl.mainChar.pos[1]);
+	renderEnemy();
 	//==========================================================================
 	unsigned int c = 0x00ffff44;
 	r.bot = gl.yres - 20;
