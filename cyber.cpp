@@ -772,19 +772,18 @@ Flt VecNormalize(Vec vec)
 void StartJump() 
 {
 	if (gl.mainChar.onGround) {
-		gl.mainChar.vel[1] = 12.0;
+		gl.mainChar.vel[1] = 14.0;
 		gl.mainChar.onGround = false;
 	}
 }
 void EndJump() 
 {
-	if (gl.mainChar.vel[1] > 6.0)
-		gl.mainChar.vel[1] = 6.0;
+	if (gl.mainChar.vel[1] > 7.0)
+		gl.mainChar.vel[1] = 10.0;
 }
 
 void physics(void)
 {
-	checkCollision();
 	if (gl.keys[XK_Right] || gl.keys[XK_Left] || gl.keys[XK_Up]) {
 		//man is walking...
 		//when time is up, advance the frame.
@@ -873,6 +872,7 @@ void physics(void)
 	}
 	//=================================================================================
 	// Shooting
+	checkCollision();
 }
 void checkCollision () {
 	//----------------------------
@@ -900,10 +900,12 @@ void checkCollision () {
 			if (lev.arr[row][col] == 'b') {
 				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
 				tileCollision(&tr);
+				break;
 			}
 			if (lev.arr[row][col] == ' ') {
 				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
 				emptyCollision(&tr);
+				break;
 			}
 			--row;
 		}
@@ -913,7 +915,7 @@ void checkCollision () {
 }
 
 void tileCollision(Vec *tile) {
-	printf("mainChar.pos[1]: %f tile[1]: %f\n", gl.mainChar.pos[1], *tile[1]+199);
+	printf("mainChar.pos[1]: %f tile[1]: %f\n", gl.mainChar.pos[1], ((*tile[1])));
 	int mainCharX = gl.xres/4.0;
 	if ((mainCharX >= *tile[0]-lev.ftsz[0]) && (mainCharX <= (*tile[0]+lev.ftsz[0])) && gl.keys[XK_Right]) {
 		gl.collisionR = 1;
