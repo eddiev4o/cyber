@@ -22,7 +22,7 @@
 //defined types
 typedef double Flt;
 typedef double Vec[3];
-typedef Flt	Matrix[4][4];
+typedef Flt Matrix[4][4];
 
 //macros
 #define rnd() (((double)rand())/(double)RAND_MAX)
@@ -64,7 +64,9 @@ void enemyPhysics(void);
 void shootbullets(void);
 void showHitbox(float, float, float, float, double, double);
 void enemyHealthBar(float, float, double, double);
-//void tileCollision(Vec *tile);
+void checkCollision();
+void tileCollision(Vec *tile);
+void emptyCollision(Vec *tile);
 //-----------------------------------------------------------------------------
 //Setup timers
 class Timers {
@@ -166,7 +168,6 @@ public:
 	Vec ball_vel;
 	Flt xc[2];
 	Flt yc[2];
-	int collision;
 	int collisionL;
 	int collisionR;
 	//Bullets
@@ -178,6 +179,7 @@ public:
 	float bulletHeight;
 	int direction;
 	int enemyDirection;
+	int underFlag;
 	//PPM IMAGES
 	Ppmimage *cyberMenuImage;
 	Ppmimage *cyberstreetImage;
@@ -199,9 +201,9 @@ public:
 	}
 	Global() {
 		logOpen();
-		collision = 0;
 		collisionR = 0;
 		collisionL = 0;
+		underFlag = 0;
 		state = STATE_STARTUP;
 		camera[0] = camera[1] = 0.0;
 		ball_pos[0] = 500.0;
@@ -782,6 +784,7 @@ void EndJump()
 
 void physics(void)
 {
+	checkCollision();
 	if (gl.keys[XK_Right] || gl.keys[XK_Left] || gl.keys[XK_Up]) {
 		//man is walking...
 		//when time is up, advance the frame.
@@ -794,7 +797,7 @@ void physics(void)
 				gl.walkFrame -= 16;
 			timers.recordTime(&timers.walkTime);
 		}
-		if (gl.keys[XK_Left] && gl.collision == 0) {
+		if (gl.keys[XK_Left] && gl.collisionL == 0) {
 			gl.camera[0] -= 2.0/lev.tilesize[0] * (1.0 / gl.delay);
 			if (gl.camera[0] < 0.0)
 				gl.camera[0] = 0.0;
@@ -802,7 +805,7 @@ void physics(void)
 			gl.xc[1] -= 0.00002;
 			gl.enemyChar.pos[0] += 1.25;
 			gl.bullets->direction = 1;
-		} else if (gl.keys[XK_Right] && gl.collision == 0) {
+		} else if (gl.keys[XK_Right] && gl.collisionR == 0) {
 			gl.camera[0] += 2.0/lev.tilesize[0] * (1.0 / gl.delay);
 			if (gl.camera[0] < 0.0)
 				gl.camera[0] = 0.0;
@@ -860,7 +863,7 @@ void physics(void)
 		gl.mainChar.pos[1] = 136.0;
 		gl.mainChar.vel[1] = 0.0;
 		gl.mainChar.onGround = true;
-	} else if (gl.mainChar.pos[1] <= h && gl.mainChar.pos[1] > h-32) {
+	} else if (gl.mainChar.pos[1] <= h && gl.mainChar.pos[1] > h-lev.ftsz[0]) {
 		gl.mainChar.vel[1] = 0.0;
 	}
 	else if (gl.mainChar.pos[1] <= h+72 && gl.mainChar.pos[1] > h) {
@@ -871,25 +874,83 @@ void physics(void)
 	//=================================================================================
 	// Shooting
 }
+void checkCollision () {
+	//----------------------------
+	Flt dd = lev.ftsz[0];
+	Flt offy = lev.tile_base;
+	int ncols_to_render = gl.xres / lev.tilesize[0] + 2;
+	int col = (int)(gl.camera[0] / dd);
+	col = col % lev.ncols;
+	//Partial tile offset must be determined here.
+	//The leftmost tile might be partially off-screen.
+	//cdd: camera position in terms of tiles.
+	Flt cdd = gl.camera[0] / dd;
+	//flo: just the integer portion
+	Flt flo = floor(cdd);
+	//dec: just the decimal portion
+	Flt dec = (cdd - flo);
+	//offx: the offset to the left of the screen to start drawing tiles
+	Flt offx = -dec * dd;
+	//Log("gl.camera[0]: %lf   offx: %lf\n",gl.camera[0],offx);
+	for (int j=0; j<ncols_to_render; j++) {
+		int row = lev.nrows-1;
+		for (int i=0; i<lev.nrows; i++) {
+			if (lev.arr[row][col] == 'w') {
+			}
+			if (lev.arr[row][col] == 'b') {
+				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
+				tileCollision(&tr);
+			}
+			if (lev.arr[row][col] == ' ') {
+				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
+				emptyCollision(&tr);
+			}
+			--row;
+		}
+		++col;
+		col = col % lev.ncols;
+	}
+}
 
-//void tileCollision(Vec *tile) {
-	//if ((gl.camera[0] >= *tile[0]) && (gl.camera[0] <= (*tile[0])) && gl.keys[XK_Right]) {
-	//	gl.collision = 1;
-	//	gl.collisionR = 1;
-	//}
-	//else if (gl.keys[XK_Left] && gl.collisionR == 1) {
-	//	gl.collision = 0;
-	//	gl.collisionR = 0;
-	//}
-	//if ((gl.camera[0] >= *tile[0]) && (gl.camera[0] <= (*tile[0])) && gl.keys[XK_Left]) {
-	//	gl.collision = 1;
-	//	gl.collisionL = 1;
-	//}
-	//else if (gl.keys[XK_Right] && gl.collisionL == 1) {
-	//	gl.collision = 0;
-	//	gl.collisionL = 0;
-	//}
-//}
+void tileCollision(Vec *tile) {
+	printf("mainChar.pos[1]: %f tile[1]: %f\n", gl.mainChar.pos[1], *tile[1]+199);
+	int mainCharX = gl.xres/4.0;
+	if ((mainCharX >= *tile[0]-lev.ftsz[0]) && (mainCharX <= (*tile[0]+lev.ftsz[0])) && gl.keys[XK_Right]) {
+		gl.collisionR = 1;
+		if (gl.mainChar.pos[1] > *tile[1]+200-lev.ftsz[1]) {
+			gl.collisionR = 0;
+		}
+	}
+	if (gl.keys[XK_Left] && gl.collisionR == 1) {
+		gl.collisionR = 0;
+	}
+	if ((mainCharX <= *tile[0]+lev.ftsz[0]) && (mainCharX >= (*tile[0]-lev.ftsz[0])) && gl.keys[XK_Left]) {
+		gl.collisionL = 1;
+		if (gl.mainChar.pos[1] > *tile[1]+200-lev.ftsz[1]) {
+			gl.collisionL = 0;
+		}
+	}
+	if (gl.keys[XK_Right] && gl.collisionL == 1) {
+		gl.collisionL = 0;
+	}
+	gl.underFlag =0;
+}
+
+void emptyCollision(Vec *tile) {
+	int mainCharX = gl.xres/4.0;
+	if ((mainCharX >= *tile[0]-lev.ftsz[0]/2) && (mainCharX <= *tile[0]+lev.ftsz[0]/2)
+		&& gl.mainChar.pos[1] - 30 <= *tile[1]+lev.ftsz[1] 
+		&& gl.mainChar.pos[1] - 30>= *tile[1]-lev.ftsz[1]) {
+		gl.collisionR = 0;
+		gl.collisionL = 0;
+	}
+	if ((mainCharX <= *tile[0]+lev.ftsz[0]) && (mainCharX >= *tile[0]-lev.ftsz[0])
+		&& gl.mainChar.pos[1] - 30<= *tile[1]+lev.ftsz[1] 
+		&& gl.mainChar.pos[1] - 30>= *tile[1]-lev.ftsz[1]) {
+		gl.collisionR = 0;
+		gl.collisionL = 0;
+	}
+}
 
 void bulletPhysics() {
 	for (int i = 0; i < gl.nbullets; i++) {
@@ -986,7 +1047,7 @@ void enemyPhysics() {
 		if (timeSpan > 0.18) { //gameDelay orig
 		//advance
 		++gl.enemyFrame;
-		printf("EnemyFrame: %i\n", gl.enemyFrame);
+		//printf("EnemyFrame: %i\n", gl.enemyFrame);
 			if (gl.enemyFrame <= 16) {
 				gl.enemyDirection = 1;
 				gl.enemyChar.pos[0] += 16;
@@ -1066,7 +1127,7 @@ void renderEnemy()
 	glDisable(GL_ALPHA_TEST);
 	showHitbox(cx, cy, h, w, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
 	enemyHealthBar(cx, cy, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
-	printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
+	//printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
 }
 
 void renderBackground()
@@ -1140,7 +1201,6 @@ void render(void)
 				glPushMatrix();
 				glBindTexture(GL_TEXTURE_2D, gl.platformTexture);
 				Vec tr = { (Flt)j*dd+offx, (Flt)i*lev.ftsz[1]+offy, 0 };
-				//tileCollision(&tr);
 				glTranslated(tr[0],tr[1],tr[2]);
 				int tx = lev.tilesize[0];
 				int ty = lev.tilesize[1];
@@ -1180,6 +1240,8 @@ void render(void)
 	//===================================
 	float h = 60.0;
 	float w = h * .8;
+	gl.mainChar.spritex = h;
+	gl.mainChar.spritey = w;
 	glPushMatrix();
 	glTranslated(gl.mainChar.pos[0],gl.mainChar.pos[1], 0);
 	glColor3f(1.0, 1.0, 1.0);
