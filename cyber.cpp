@@ -144,7 +144,8 @@ enum State {
 	STATE_STARTUP,
 	STATE_GAMEPLAY,
 	STATE_PAUSE,
-	STATE_GAMEOVER
+	STATE_GAMEOVER,
+	STATE_CREDITS
 };
 
 class Global {
@@ -186,6 +187,7 @@ public:
 	Ppmimage *floorImage;
 	Ppmimage *platformImage;
 	Ppmimage *enemyImage;
+	Ppmimage *creditsImage;
 	//---------------------------
 	//TEXTURES
 	//GLuint walkTexture;
@@ -194,6 +196,7 @@ public:
 	GLuint floorTexture;
 	GLuint platformTexture;
 	GLuint enemyTexture;
+	GLuint creditsTexture;
 	//---------------------------
 	~Global() {
 		delete [] bullets;
@@ -227,6 +230,7 @@ public:
 		floorImage=NULL;
 		platformImage=NULL;
 		enemyImage=NULL;
+		creditsImage=NULL;
 		//
 		delay = 0.05;
 		mainChar.pos[1] = 0.0;
@@ -463,6 +467,7 @@ void initOpengl(void)
 	system("convert ./images/floor.png ./images/floor.ppm");
 	system("convert ./images/platform.png ./images/platform.ppm");
 	system("convert ./images/enemy.gif ./images/enemy.ppm");
+	system("convert ./images/credits.png ./images/credits.ppm");
 	//=========================
 	// Get Images
 	//======================================
@@ -471,6 +476,7 @@ void initOpengl(void)
 	gl.floorImage = ppm6GetImage("./images/floor.ppm");
 	gl.platformImage = ppm6GetImage("./images/platform.ppm");
 	gl.enemyImage = ppm6GetImage("./images/enemy.ppm");
+	gl.creditsImage = ppm6GetImage("./images/credits.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
@@ -478,6 +484,7 @@ void initOpengl(void)
 	glGenTextures(1, &gl.floorTexture);
 	glGenTextures(1, &gl.platformTexture);
 	glGenTextures(1, &gl.enemyTexture);
+	glGenTextures(1, &gl.creditsTexture);
 	//======================================
 
 
@@ -572,6 +579,18 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, enemyData);
 	free(enemyData);
 	unlink("./images/enemy.ppm");
+	//------------------------------------------------------
+	//Credits Texture
+	w = gl.creditsImage->width;
+	h = gl.creditsImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.creditsTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *creditsData = buildAlphaData(gl.creditsImage);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, creditsData);
+	free(creditsData);
+	unlink("./images/credits.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -720,6 +739,12 @@ void checkKeys(XEvent *e)
 			gl.walk ^= 1;
 			break;
 		case XK_e:
+			break;
+		case XK_c:
+			if (gl.state == STATE_STARTUP) {
+				gl.state = STATE_CREDITS;
+				break;
+			}
 			break;
 		case XK_f:
 			break;
@@ -1342,7 +1367,7 @@ void render(void)
 	//PAUSE SCREEN
 	if (gl.state == STATE_PAUSE) {
 	    	int h = 100.0;
-		int w = 200.0;;			
+		int w = 200.0;			
 		Rect r;
 		glPushMatrix();
 		glEnable(GL_BLEND);
@@ -1366,6 +1391,22 @@ void render(void)
 		ggprint8b(&r, 16, 0, "M - Main Menu");
 		ggprint8b(&r, 16, 0, "R - Resume");
 
+	
+	}
+	//===========================================================================
+	//Credits Screen
+	if (gl.state == STATE_CREDITS) {
+		glPushMatrix();
+		glColor3f(1.0,1.0,1.0);
+		glBindTexture(GL_TEXTURE_2D, gl.creditsTexture);
+		glBegin(GL_QUADS);
+			glTexCoord2f(0.0, 1.0); glVertex2i(0, 0);
+			glTexCoord2f(0.0, 0.0); glVertex2i(0,  gl.yres);
+			glTexCoord2f(1.0, 0.0); glVertex2i(gl.xres, gl.yres);
+			glTexCoord2f(1.0, 1.0); glVertex2i(gl.xres,  0);
+		glEnd();
+		glPopMatrix();
+		glBindTexture(GL_TEXTURE_2D, 0);
 	
 	}
 }
