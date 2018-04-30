@@ -63,6 +63,7 @@ void bulletPhysics(void);
 void enemyPhysics(void);
 void shootbullets(void);
 void showHitbox(float, float, float, float, double, double);
+void Hitbox(float, float, double, double);
 void enemyHealthBar(float, float, double, double);
 void checkCollision();
 void tileCollision(Vec *tile);
@@ -940,7 +941,7 @@ void checkCollision () {
 }
 
 void tileCollision(Vec *tile) {
-	printf("mainChar.pos[1]: %f tile[1]: %f\n", gl.mainChar.pos[1], ((*tile[1])));
+	//printf("mainChar.pos[1]: %f tile[1]: %f\n", gl.mainChar.pos[1], ((*tile[1])));
 	int mainCharX = gl.xres/4.0;
 	if ((mainCharX >= *tile[0]-lev.ftsz[0]) && (mainCharX <= (*tile[0]+lev.ftsz[0])) && gl.keys[XK_Right]) {
 		gl.collisionR = 1;
@@ -1051,6 +1052,26 @@ void healthBar()
         }	
 }
 
+void Hitbox(float cy, float height, double *pos0, double *pos1) 
+{
+	float miny = cy - 32;
+	float maxy = cy + height - 32;
+	for (int i = 0; i < gl.nbullets; i++) {
+		printf("gl.bullets[i].pos[1]: %f\n", gl.bullets[i].pos[1]);
+		printf("pos1+miny: %f pos1+maxy: %f\n", (*pos1 + miny), (*pos1 + maxy));
+		if (gl.bullets[i].pos[0] >= *pos0+200 && gl.bullets[i].pos[0] <= *pos0+400
+			&& gl.bullets[i].pos[1] >= *pos1 + miny
+			&& gl.bullets[i].pos[1] <= *pos1 + maxy) {
+			gl.enemyChar.health -= 5;
+			if (gl.enemyChar.health <= 0) {
+			gl.enemyChar.pos[0] = -1000000;
+			gl.enemyChar.pos[1] = -1000000;
+			}
+			gl.bullets[i] = gl.bullets[gl.nbullets - 1];
+			gl.nbullets--;
+		}
+	}
+}
 void showHitbox(float cx, float cy, float height, float width, double *pos0, double *pos1) 
 {
 	float w = width;
@@ -1153,6 +1174,7 @@ void renderEnemy()
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
 	showHitbox(cx, cy, h, w, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
+	Hitbox(cy, h, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
 	enemyHealthBar(cx, cy, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
 	//printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
 }
