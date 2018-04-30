@@ -18,6 +18,9 @@
 #include "log.h"
 #include "ppm.h"
 #include "fonts.h"
+#ifdef USE_OPENAL_SOUND
+#include </usr/include/AL/alut.h>
+#endif
 
 //defined types
 typedef double Flt;
@@ -33,6 +36,7 @@ typedef Flt Matrix[4][4];
 #define VecSub(a,b,c) (c)[0]=(a)[0]-(b)[0]; \
                       (c)[1]=(a)[1]-(b)[1]; \
                       (c)[2]=(a)[2]-(b)[2]
+
 //constants
 const float timeslice = 1.0f;
 const float gravity = -0.2f;
@@ -65,9 +69,10 @@ void shootbullets(void);
 void showHitbox(float, float, float, float, double, double);
 void Hitbox(float, float, double, double);
 void enemyHealthBar(float, float, double, double);
-void checkCollision();
+void checkCollision(void);
 void tileCollision(Vec *tile);
 void emptyCollision(Vec *tile);
+void gameOver(void);
 //-----------------------------------------------------------------------------
 //Setup timers
 class Timers {
@@ -79,6 +84,7 @@ public:
 	struct timespec enemyTime;
 	struct timespec jumpTime;
 	struct timespec httpTime;
+	struct timespec gameoverTime;
 	Timers() {
 		physicsRate = 1.0 / 30.0;
 		oobillion = 1.0 / 1e9;
@@ -160,7 +166,10 @@ public:
 	int walkFrame;
 	int enemyFrame;
 	int httpFrame;
+	int gameoverFrame;
+	int countdown;
 	double delay;
+	double gameDelay;
 	Vec box[20];
 	Sprite mainChar;
 	Sprite enemyChar;
@@ -189,6 +198,8 @@ public:
 	Ppmimage *platformImage;
 	Ppmimage *enemyImage;
 	Ppmimage *creditsImage;
+	Ppmimage *gameoverImage;
+	Ppmimage *bluebackImage;
 	//---------------------------
 	//TEXTURES
 	//GLuint walkTexture;
@@ -198,6 +209,8 @@ public:
 	GLuint platformTexture;
 	GLuint enemyTexture;
 	GLuint creditsTexture;
+	GLuint gameoverTexture;
+	GLuint bluebackTexture;
 	//---------------------------
 	~Global() {
 		delete [] bullets;
@@ -223,7 +236,9 @@ public:
 		enemyDirection=1;
 		httpFrame=0;
 		walkFrame=0;
+		gameoverFrame=0;
 		enemyFrame=0;
+		countdown = 10;
 		//image variables
 		mainChar.image=NULL;
 		cyberMenuImage=NULL;
@@ -232,8 +247,10 @@ public:
 		platformImage=NULL;
 		enemyImage=NULL;
 		creditsImage=NULL;
+		gameoverImage=NULL;
 		//
 		delay = 0.05;
+		gameDelay = 0.01;
 		mainChar.pos[1] = 0.0;
 		mainChar.pos[2] = 0.0;
 		mainChar.vel[0] = 0.0;
@@ -312,7 +329,6 @@ int main(void)
 {
 	initXWindows();
 	initOpengl();
-	init();
 	while (!gl.done) {
 		while (XPending(dpy)) {
 			XEvent e;
@@ -322,18 +338,7 @@ int main(void)
 			checkKeys(&e);
 		}
 		if(gl.state == STATE_STARTUP) {
-			gl.xc[0] = 0.0;
-			gl.yc[0] = 0.0;
-			gl.xc[1] = 1.0;
-			gl.yc[1] = 1.0;
-			gl.camera[0] = 0.0;
-			gl.camera[1] = 0.0;
-			gl.mainChar.pos[0] = 0.0;
-			gl.mainChar.pos[1] = 0.0;
-			gl.mainChar.health = 20.0;
-			gl.enemyChar.pos[0] = 500;
-			gl.enemyChar.pos[1] = 0.0;
-			gl.enemyChar.health = 10.0;
+			init();
 		}
 		if(gl.state == STATE_GAMEPLAY) {	
 			physics();
@@ -469,6 +474,8 @@ void initOpengl(void)
 	system("convert ./images/platform.png ./images/platform.ppm");
 	system("convert ./images/enemy.gif ./images/enemy.ppm");
 	system("convert ./images/credits.png ./images/credits.ppm");
+	system("convert ./images/gameover.png ./images/gameover.ppm");
+	system("convert ./images/blueback.png ./images/blueback.ppm");
 	//=========================
 	// Get Images
 	//======================================
@@ -478,6 +485,8 @@ void initOpengl(void)
 	gl.platformImage = ppm6GetImage("./images/platform.ppm");
 	gl.enemyImage = ppm6GetImage("./images/enemy.ppm");
 	gl.creditsImage = ppm6GetImage("./images/credits.ppm");
+	gl.gameoverImage = ppm6GetImage("./images/gameover.ppm");
+	gl.bluebackImage = ppm6GetImage("./images/blueback.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
@@ -486,6 +495,8 @@ void initOpengl(void)
 	glGenTextures(1, &gl.platformTexture);
 	glGenTextures(1, &gl.enemyTexture);
 	glGenTextures(1, &gl.creditsTexture);
+	glGenTextures(1, &gl.gameoverTexture);
+	glGenTextures(1, &gl.bluebackTexture);
 	//======================================
 
 
@@ -592,6 +603,30 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, creditsData);
 	free(creditsData);
 	unlink("./images/credits.ppm");
+	//------------------------------------------------------
+	//Game Over Texture
+	w = gl.gameoverImage->width;
+	h = gl.gameoverImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.gameoverTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *gameoverData = buildAlphaData(gl.gameoverImage);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, gameoverData);
+	free(gameoverData);
+	unlink("./images/gameover.ppm");
+	//------------------------------------------------------
+	//Game Over Texture
+	w = gl.bluebackImage->width;
+	h = gl.bluebackImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.bluebackTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *bluebackData = buildAlphaData(gl.bluebackImage);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, bluebackData);
+	free(bluebackData);
+	unlink("./images/blueback.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -608,7 +643,21 @@ void checkResize(XEvent *e)
 }
 
 void init() {
-
+	gl.xc[0] = 0.0;
+	gl.yc[0] = 0.0;
+	gl.xc[1] = 1.0;
+	gl.yc[1] = 1.0;
+	gl.camera[0] = 0.0;
+	gl.camera[1] = 0.0;
+	gl.mainChar.pos[0] = 0.0;
+	gl.mainChar.pos[1] = 0.0;
+	gl.mainChar.health = 20.0;
+	gl.enemyChar.pos[0] = 500;
+	gl.enemyChar.pos[1] = 0.0;
+	gl.enemyChar.health = 10.0;
+	gl.walkFrame = 0;
+	gl.enemyFrame = 0;
+	gl.gameoverFrame = 0;
 }
 
 void checkMouse(XEvent *e)
@@ -1056,6 +1105,7 @@ void Hitbox(float cy, float height, double *pos0, double *pos1)
 {
 	float miny = cy - 32;
 	float maxy = cy + height - 32;
+	int mainCharX = gl.xres/4.0;
 	for (int i = 0; i < gl.nbullets; i++) {
 		printf("gl.bullets[i].pos[1]: %f\n", gl.bullets[i].pos[1]);
 		printf("pos1+miny: %f pos1+maxy: %f\n", (*pos1 + miny), (*pos1 + maxy));
@@ -1071,7 +1121,14 @@ void Hitbox(float cy, float height, double *pos0, double *pos1)
 			gl.nbullets--;
 		}
 	}
+	if (mainCharX >= *pos0+200 && mainCharX <= *pos0+400) {
+		gl.mainChar.health -= 1;
+		if (gl.mainChar.health <= 0) {
+			gl.state = STATE_GAMEOVER;
+		}
+	}
 }
+
 void showHitbox(float cx, float cy, float height, float width, double *pos0, double *pos1) 
 {
 	float w = width;
@@ -1179,6 +1236,66 @@ void renderEnemy()
 	//printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
 }
 
+void gameOver()
+{
+	timers.recordTime(&timers.timeCurrent);
+	double timeSpan = timers.timeDiff(&timers.gameoverTime, &timers.timeCurrent);
+	if (timeSpan > 1.0) {
+		++gl.gameoverFrame;
+		--gl.countdown;
+		timers.recordTime(&timers.gameoverTime);
+	}
+	if (gl.gameoverFrame <= 10) {
+		if (gl.keys[XK_c]) {
+			gl.state = STATE_GAMEPLAY;
+			init();
+			return;
+		}
+		glClearColor(0.1, 0.1, 0.1, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glPushMatrix();
+		glColor3f(1.0,1.0,1.0);
+		glBindTexture(GL_TEXTURE_2D, gl.bluebackTexture);
+		glBegin(GL_QUADS);
+			glTexCoord2f(0.0, 1.0); glVertex2i(0, 0);
+			glTexCoord2f(0.0, 0.0); glVertex2i(0,  gl.yres);
+			glTexCoord2f(1.0, 0.0); glVertex2i(gl.xres, gl.yres);
+			glTexCoord2f(1.0, 1.0); glVertex2i(gl.xres,  0);
+		glEnd();
+		glPopMatrix();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		
+		glPushMatrix();
+		glColor3f(1.0,1.0,1.0);
+		glBindTexture(GL_TEXTURE_2D, gl.gameoverTexture);
+		glEnable(GL_ALPHA_TEST);
+		glColor4ub(255,255,255,255);
+		//glEnable(GL_TEXTURE_2D);
+		glAlphaFunc(GL_GREATER, 0.0f);
+		glColor4ub(255,255,255,255);
+		glBegin(GL_QUADS);
+		        glTexCoord2f(0.0, 1.0); glVertex2i(0,0);
+		        glTexCoord2f(0.0, 0.0); glVertex2i(0,gl.yres);
+		        glTexCoord2f(1.0, 0.0); glVertex2i(gl.xres,gl.yres);
+		        glTexCoord2f(1.0, 1.0); glVertex2i(gl.xres,0);
+		glEnd();
+		glPopMatrix();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glDisable(GL_ALPHA_TEST);
+		
+		Rect r;
+        	unsigned int c = 0xFFFF00;
+        	r.bot = gl.yres/4;
+        	r.left = (gl.xres/2);
+        	r.center = 0;
+        	ggprint8b(&r, 16, c, "CONTINUE? %i", gl.countdown);
+        	ggprint8b(&r, 16, c, "PRESS C TO CONTINUE");	
+	}
+	if (gl.gameoverFrame > 10) {
+		gl.state = STATE_STARTUP;
+	}
+}
+
 void renderBackground()
 {
 	glPushMatrix();
@@ -1197,6 +1314,10 @@ void renderBackground()
 
 void render(void)
 {
+	if (gl.mainChar.health <= 0) {
+		gl.state = STATE_GAMEOVER;
+		gameOver();
+	}
 	if (gl.state == STATE_GAMEPLAY) {
 	Rect r;
 	//Clear the screen
@@ -1269,18 +1390,6 @@ void render(void)
 	}
 
 	//===================================
-	//draw ball
-	//glColor3f(1.0, 1.0, 0.0);
-	//glPushMatrix();
-	//glTranslated(gl.ball_pos[0],gl.ball_pos[1], 0);
-	//glBegin(GL_QUADS);
-	//	glVertex2i( 0,  0);
-	//	glVertex2i( 0, 10);
-	//	glVertex2i(10, 10);
-	//	glVertex2i(10,  0);
-	//glEnd();
-	//glPopMatrix();
-	//===================================
 	healthBar();
 	bulletPhysics();
 
@@ -1333,29 +1442,20 @@ void render(void)
 	r.left = gl.xres-100;
 	r.center = 0;
 	ggprint8b(&r, 16, c, "frame: %i", gl.walkFrame);
-	if (gl.movie) {
-		screenCapture();
-	}
 	}
 	//=========================================================================
 	//STARTUP STATE
 	if (gl.state == STATE_STARTUP) {
-	    	int h = gl.yres;
-		int w = gl.xres;			
 		Rect r;
 		glPushMatrix();
-		//glEnable(GL_BLEND);
-		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		//glColor4f(0.45,0.45,0.45,0.8);
-		glColor3f(0.2,0.2,0.2);
-		glTranslated(gl.xres/2, gl.yres/2, 0);
+		glColor3f(1.0,1.0,1.0);
+		glBindTexture(GL_TEXTURE_2D, gl.bluebackTexture);
 		glBegin(GL_QUADS);
-			glVertex2i(-w, -h);
-			glVertex2i(-w,  h);
-			glVertex2i(w,   h);
-			glVertex2i(w,  -h);
+			glTexCoord2f(0.0, 1.0); glVertex2i(0, 0);
+			glTexCoord2f(0.0, 0.0); glVertex2i(0,  gl.yres);
+			glTexCoord2f(1.0, 0.0); glVertex2i(gl.xres, gl.yres);
+			glTexCoord2f(1.0, 1.0); glVertex2i(gl.xres,  0);
 		glEnd();
-		//glDisable(GL_BLEND);
 		glPopMatrix();
 		glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -1418,6 +1518,9 @@ void render(void)
 	//===========================================================================
 	//Credits Screen
 	if (gl.state == STATE_CREDITS) {
+		if (gl.keys[XK_m]) {
+			gl.state = STATE_STARTUP;
+		}
 		glPushMatrix();
 		glColor3f(1.0,1.0,1.0);
 		glBindTexture(GL_TEXTURE_2D, gl.creditsTexture);
