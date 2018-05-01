@@ -154,6 +154,7 @@ enum State {
 	STATE_GAMEPLAY,
 	STATE_PAUSE,
 	STATE_GAMEOVER,
+	STATE_COMPLETE,
 	STATE_CREDITS
 };
 
@@ -204,6 +205,7 @@ public:
 	Ppmimage *creditsImage;
 	Ppmimage *gameoverImage;
 	Ppmimage *bluebackImage;
+	Ppmimage *endImage;
 	//---------------------------
 	//TEXTURES
 	//GLuint walkTexture;
@@ -215,6 +217,7 @@ public:
 	GLuint creditsTexture;
 	GLuint gameoverTexture;
 	GLuint bluebackTexture;
+	GLuint endTexture;
 	//---------------------------
 	~Global() {
 		delete [] bullets;
@@ -253,7 +256,9 @@ public:
 		platformImage=NULL;
 		enemyImage=NULL;
 		creditsImage=NULL;
+		bluebackImage=NULL;
 		gameoverImage=NULL;
+		endImage=NULL;
 		//
 		delay = 0.05;
 		gameDelay = 0.01;
@@ -476,6 +481,7 @@ void initOpengl(void)
 	system("convert ./images/credits.png ./images/credits.ppm");
 	system("convert ./images/gameover.png ./images/gameover.ppm");
 	system("convert ./images/blueback.png ./images/blueback.ppm");
+	system("convert ./images/end.png ./images/end.ppm");
 	//=========================
 	// Get Images
 	//======================================
@@ -487,6 +493,7 @@ void initOpengl(void)
 	gl.creditsImage = ppm6GetImage("./images/credits.ppm");
 	gl.gameoverImage = ppm6GetImage("./images/gameover.ppm");
 	gl.bluebackImage = ppm6GetImage("./images/blueback.ppm");
+	gl.endImage = ppm6GetImage("./images/end.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
@@ -497,6 +504,7 @@ void initOpengl(void)
 	glGenTextures(1, &gl.creditsTexture);
 	glGenTextures(1, &gl.gameoverTexture);
 	glGenTextures(1, &gl.bluebackTexture);
+	glGenTextures(1, &gl.endTexture);
 	//======================================
 
 
@@ -627,6 +635,18 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, bluebackData);
 	free(bluebackData);
 	unlink("./images/blueback.ppm");
+	//------------------------------------------------------
+	//Game Over Texture
+	w = gl.endImage->width;
+	h = gl.endImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.endTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *endData = buildAlphaData(gl.endImage);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, endData);
+	free(endData);
+	unlink("./images/end.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -1320,6 +1340,34 @@ void gameOver()
 	}
 }
 
+void levelOver()
+{
+	gl.state = STATE_COMPLETE;
+	timers.recordTime(&timers.timeCurrent);
+	double timeSpan = timers.timeDiff(&timers.gameoverTime, &timers.timeCurrent);
+	if (timeSpan > 1.0) {
+		++gl.gameoverFrame;
+		timers.recordTime(&timers.gameoverTime);
+	}
+	if (gl.gameoverFrame <= 5) {
+		glPushMatrix();
+		glBindTexture(GL_TEXTURE_2D, gl.endTexture);
+		glEnable(GL_ALPHA_TEST);
+		glAlphaFunc(GL_GREATER, 0.0f);
+		glBegin(GL_QUADS);
+			glTexCoord2f(0.0, 1.0); glVertex2i(0, 0);
+			glTexCoord2f(0.0, 0.0); glVertex2i(0,  gl.yres);
+			glTexCoord2f(1.0, 0.0); glVertex2i(gl.xres, gl.yres);
+			glTexCoord2f(1.0, 1.0); glVertex2i(gl.xres,  0);
+		glEnd();
+		glPopMatrix();
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	if (gl.gameoverFrame > 5) {
+		gl.state = STATE_STARTUP;
+	}
+}
+
 void renderFPS()
 {
 	Rect r;
@@ -1358,7 +1406,7 @@ void render(void)
 		gl.state = STATE_GAMEOVER;
 		gameOver();
 	}
-	if (gl.state == STATE_GAMEPLAY) {
+	if (gl.state == STATE_GAMEPLAY || gl.state == STATE_COMPLETE) {
 	//Clear the screen
 	glClearColor(0.1, 0.1, 0.1, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -1478,8 +1526,14 @@ void render(void)
 		renderEnemy(&gl.enemyChar[i]);
 	}
 	renderFPS();
-	//==========================================================================
+	if (gl.camera[0] >= 500) {
+		gl.state = STATE_COMPLETE;
+		levelOver();
 	}
+	}
+
+
+
 	//=========================================================================
 	//STARTUP STATE
 	if (gl.state == STATE_STARTUP) {
