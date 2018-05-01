@@ -686,10 +686,20 @@ void init() {
 	gl.enemyChar[0].pos[1] = 0.0;
 	gl.enemyChar[1].pos[0] = 1104;
 	gl.enemyChar[1].pos[1] = 224.0;
-	gl.enemyChar[2].pos[0] = 5216;
+	gl.enemyChar[2].pos[0] = 1424;
 	gl.enemyChar[2].pos[1] = 0.0;
-	gl.enemyChar[3].pos[0] = 5536;
+	gl.enemyChar[3].pos[0] = 1920;
 	gl.enemyChar[3].pos[1] = 0.0;
+	gl.enemyChar[4].pos[0] = 2240;
+	gl.enemyChar[4].pos[1] = 0.0;
+	gl.enemyChar[5].pos[0] = 2560;
+	gl.enemyChar[5].pos[1] = 0.0;
+	gl.enemyChar[6].pos[0] = 3072;
+	gl.enemyChar[6].pos[1] = 64.0;
+	gl.enemyChar[7].pos[0] = 5216;
+	gl.enemyChar[7].pos[1] = 0.0;
+	gl.enemyChar[8].pos[0] = 5536;
+	gl.enemyChar[8].pos[1] = 0.0;
 }
 
 void checkMouse(XEvent *e)
@@ -909,10 +919,9 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] -= 0.00002;
 			gl.xc[1] -= 0.00002;
-			gl.enemyChar[0].pos[0] += gl.speed;
-			gl.enemyChar[1].pos[0] += gl.speed;
-			gl.enemyChar[2].pos[0] += gl.speed;
-			gl.enemyChar[3].pos[0] += gl.speed;
+			for (int i = 0; i < 9; i++) {
+				gl.enemyChar[i].pos[0] += gl.speed;
+			}
 			gl.bullets->direction = 1;
 		} else if (gl.keys[XK_Right] && gl.collisionR == 0) {
 			gl.camera[0] += gl.speed;
@@ -920,10 +929,9 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] += 0.0002;
 			gl.xc[1] += 0.0002;
-			gl.enemyChar[0].pos[0] -= gl.speed;
-			gl.enemyChar[1].pos[0] -= gl.speed;
-			gl.enemyChar[2].pos[0] -= gl.speed;
-			gl.enemyChar[3].pos[0] -= gl.speed;
+			for (int i = 0; i < 9; i++) {
+				gl.enemyChar[i].pos[0] -= gl.speed;
+			}
 			gl.bullets->direction = 0;
 		}
 	}
@@ -1195,13 +1203,13 @@ void enemyPhysics() {
 		//printf("EnemyFrame: %i\n", gl.enemyFrame);
 			if (gl.enemyFrame <= 16) {
 				gl.enemyDirection = 1;
-				for (int i = 0; i < 4; i++) {
+				for (int i = 0; i < 9; i++) {
 					gl.enemyChar[i].pos[0] += 16;
 				}
 			}
 			if (gl.enemyFrame < 32 && gl.enemyFrame > 16) {
 				gl.enemyDirection = 0;
-				for (int i = 0; i < 4; i++) {
+				for (int i = 0; i < 9; i++) {
 					gl.enemyChar[i].pos[0] -= 16;
 				}
 			}
@@ -1522,11 +1530,11 @@ void render(void)
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
 	showHitbox(cx, cy, h, w, gl.mainChar);
-	for(int i=0; i < 4; i++) {
+	for(int i=0; i < 9; i++) {
 		renderEnemy(&gl.enemyChar[i]);
 	}
 	renderFPS();
-	if (gl.camera[0] >= 500) {
+	if (gl.camera[0] >= 10000) {
 		gl.state = STATE_COMPLETE;
 		levelOver();
 	}
