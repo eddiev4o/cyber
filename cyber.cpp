@@ -60,6 +60,7 @@ void render(void);
 //Functions by self
 void healthBar(void);
 void renderBackground(void);
+void renderFPS(void);
 void StartJump(void);
 void EndJump(void);
 void bullets(void);
@@ -82,7 +83,7 @@ public:
 	struct timespec timeStart, timeEnd, timeCurrent;
 	struct timespec walkTime;
 	struct timespec enemyTime;
-	struct timespec jumpTime;
+	struct timespec frameTime;
 	struct timespec httpTime;
 	struct timespec gameoverTime;
 	Timers() {
@@ -166,6 +167,7 @@ public:
 	int walkFrame;
 	int enemyFrame;
 	int httpFrame;
+	double fps;
 	int gameoverFrame;
 	int countdown;
 	double delay;
@@ -173,6 +175,7 @@ public:
 	Vec box[20];
 	Sprite mainChar;
 	Sprite enemyChar;
+	double speed;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
 	Vec ball_pos;
@@ -238,7 +241,9 @@ public:
 		walkFrame=0;
 		gameoverFrame=0;
 		enemyFrame=0;
+		fps=0;
 		countdown = 10;
+		speed = 2.25;
 		//image variables
 		mainChar.image=NULL;
 		cyberMenuImage=NULL;
@@ -652,7 +657,7 @@ void init() {
 	gl.mainChar.pos[0] = 0.0;
 	gl.mainChar.pos[1] = 0.0;
 	gl.mainChar.health = 20.0;
-	gl.enemyChar.pos[0] = 500;
+	gl.enemyChar.pos[0] = 768;
 	gl.enemyChar.pos[1] = 0.0;
 	gl.enemyChar.health = 10.0;
 	gl.walkFrame = 0;
@@ -872,20 +877,20 @@ void physics(void)
 			timers.recordTime(&timers.walkTime);
 		}
 		if (gl.keys[XK_Left] && gl.collisionL == 0) {
-			gl.camera[0] -= 2.0/lev.tilesize[0] * (1.0 / gl.delay);
+			gl.camera[0] -= gl.speed;
 			if (gl.camera[0] < 0.0)
 				gl.camera[0] = 0.0;
 			gl.xc[0] -= 0.00002;
 			gl.xc[1] -= 0.00002;
-			gl.enemyChar.pos[0] += 1.25;
+			gl.enemyChar.pos[0] += gl.speed;
 			gl.bullets->direction = 1;
 		} else if (gl.keys[XK_Right] && gl.collisionR == 0) {
-			gl.camera[0] += 2.0/lev.tilesize[0] * (1.0 / gl.delay);
+			gl.camera[0] += gl.speed;
 			if (gl.camera[0] < 0.0)
 				gl.camera[0] = 0.0;
 			gl.xc[0] += 0.0002;
 			gl.xc[1] += 0.0002;
-			gl.enemyChar.pos[0] -= 1.25;
+			gl.enemyChar.pos[0] -= gl.speed;
 			gl.bullets->direction = 0;
 		}
 	}
@@ -990,7 +995,7 @@ void checkCollision () {
 }
 
 void tileCollision(Vec *tile) {
-	//printf("mainChar.pos[1]: %f tile[1]: %f\n", gl.mainChar.pos[1], ((*tile[1])));
+	printf("mainChar.pos[1]: %f tile[1]: %f\n", gl.mainChar.pos[1], ((*tile[1])));
 	int mainCharX = gl.xres/4.0;
 	if ((mainCharX >= *tile[0]-lev.ftsz[0]) && (mainCharX <= (*tile[0]+lev.ftsz[0])) && gl.keys[XK_Right]) {
 		gl.collisionR = 1;
@@ -1107,8 +1112,8 @@ void Hitbox(float cy, float height, double *pos0, double *pos1)
 	float maxy = cy + height - 32;
 	int mainCharX = gl.xres/4.0;
 	for (int i = 0; i < gl.nbullets; i++) {
-		printf("gl.bullets[i].pos[1]: %f\n", gl.bullets[i].pos[1]);
-		printf("pos1+miny: %f pos1+maxy: %f\n", (*pos1 + miny), (*pos1 + maxy));
+		//printf("gl.bullets[i].pos[1]: %f\n", gl.bullets[i].pos[1]);
+		//printf("pos1+miny: %f pos1+maxy: %f\n", (*pos1 + miny), (*pos1 + maxy));
 		if (gl.bullets[i].pos[0] >= *pos0+200 && gl.bullets[i].pos[0] <= *pos0+400
 			&& gl.bullets[i].pos[1] >= *pos1 + miny
 			&& gl.bullets[i].pos[1] <= *pos1 + maxy) {
@@ -1296,6 +1301,22 @@ void gameOver()
 	}
 }
 
+void renderFPS()
+{
+	Rect r;
+	double timeSpan = timers.timeDiff(&timers.frameTime, &timers.timeCurrent);
+	gl.fps++;
+	if (timeSpan >= 1.0) {
+		gl.fps = 0;
+		timers.recordTime(&timers.frameTime);
+	}
+	unsigned int c = 0x00ffff44;
+	r.bot = gl.yres - 20;
+	r.left = gl.xres-100;
+	r.center = 0;
+	ggprint8b(&r, 16, c, "fps: %0.2f", gl.fps/timeSpan);
+}
+
 void renderBackground()
 {
 	glPushMatrix();
@@ -1319,7 +1340,6 @@ void render(void)
 		gameOver();
 	}
 	if (gl.state == STATE_GAMEPLAY) {
-	Rect r;
 	//Clear the screen
 	glClearColor(0.1, 0.1, 0.1, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -1436,12 +1456,8 @@ void render(void)
 	glDisable(GL_ALPHA_TEST);
 	showHitbox(cx, cy, h, w, &gl.mainChar.pos[0], &gl.mainChar.pos[1]);
 	renderEnemy();
+	renderFPS();
 	//==========================================================================
-	unsigned int c = 0x00ffff44;
-	r.bot = gl.yres - 20;
-	r.left = gl.xres-100;
-	r.center = 0;
-	ggprint8b(&r, 16, c, "frame: %i", gl.walkFrame);
 	}
 	//=========================================================================
 	//STARTUP STATE
