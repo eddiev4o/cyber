@@ -67,9 +67,6 @@ void bullets(void);
 void bulletPhysics(void);
 void enemyPhysics(void);
 void shootbullets(void);
-void showHitbox(float, float, float, float, double, double);
-void Hitbox(float, float, double, double);
-void enemyHealthBar(float, float, double, double);
 void checkCollision(void);
 void tileCollision(Vec *tile);
 void emptyCollision(Vec *tile);
@@ -147,6 +144,10 @@ public:
 	}
 };
 
+void showHitbox(float, float, float, float, Sprite);
+void Hitbox(float, float, Sprite*);
+void enemyHealthBar(float, float, Sprite*);
+
 enum State {
 	STATE_NONE,
 	STATE_STARTUP,
@@ -174,7 +175,7 @@ public:
 	double gameDelay;
 	Vec box[20];
 	Sprite mainChar;
-	Sprite enemyChar;
+	Sprite enemyChar[10];
 	double speed;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
@@ -262,12 +263,6 @@ public:
 		mainChar.vel[1] = 0.0;
 		mainChar.onGround = false;
 		mainChar.health = 20.0;
-		enemyChar.pos[0] = 0.0;
-		enemyChar.pos[1] = 0.0;
-		enemyChar.vel[0] = 0.0;
-		enemyChar.vel[1] = 0.0;
-		enemyChar.onGround = false;
-		enemyChar.health = 10.0;
 		memset(keys, 0, 65536);
 		//Bullets
 		bullets = new Bullet[MAX_BULLETS];
@@ -657,12 +652,24 @@ void init() {
 	gl.mainChar.pos[0] = 0.0;
 	gl.mainChar.pos[1] = 0.0;
 	gl.mainChar.health = 20.0;
-	gl.enemyChar.pos[0] = 768;
-	gl.enemyChar.pos[1] = 0.0;
-	gl.enemyChar.health = 10.0;
 	gl.walkFrame = 0;
 	gl.enemyFrame = 0;
 	gl.gameoverFrame = 0;
+	for (int i = 0; i < 10; i++) {	
+		gl.enemyChar[i].vel[0] = 0.0;
+		gl.enemyChar[i].vel[1] = 0.0;
+		gl.enemyChar[i].onGround = false;
+		gl.enemyChar[i].health = 10.0;
+		gl.enemyChar[i].health = 10.0;
+	}
+	gl.enemyChar[0].pos[0] = 768;
+	gl.enemyChar[0].pos[1] = 0.0;
+	gl.enemyChar[1].pos[0] = 1104;
+	gl.enemyChar[1].pos[1] = 224.0;
+	gl.enemyChar[2].pos[0] = 5216;
+	gl.enemyChar[2].pos[1] = 0.0;
+	gl.enemyChar[3].pos[0] = 5536;
+	gl.enemyChar[3].pos[1] = 0.0;
 }
 
 void checkMouse(XEvent *e)
@@ -882,7 +889,10 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] -= 0.00002;
 			gl.xc[1] -= 0.00002;
-			gl.enemyChar.pos[0] += gl.speed;
+			gl.enemyChar[0].pos[0] += gl.speed;
+			gl.enemyChar[1].pos[0] += gl.speed;
+			gl.enemyChar[2].pos[0] += gl.speed;
+			gl.enemyChar[3].pos[0] += gl.speed;
 			gl.bullets->direction = 1;
 		} else if (gl.keys[XK_Right] && gl.collisionR == 0) {
 			gl.camera[0] += gl.speed;
@@ -890,7 +900,10 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] += 0.0002;
 			gl.xc[1] += 0.0002;
-			gl.enemyChar.pos[0] -= gl.speed;
+			gl.enemyChar[0].pos[0] -= gl.speed;
+			gl.enemyChar[1].pos[0] -= gl.speed;
+			gl.enemyChar[2].pos[0] -= gl.speed;
+			gl.enemyChar[3].pos[0] -= gl.speed;
 			gl.bullets->direction = 0;
 		}
 	}
@@ -1106,7 +1119,7 @@ void healthBar()
         }	
 }
 
-void Hitbox(float cy, float height, double *pos0, double *pos1) 
+void Hitbox(float cy, float height, Sprite *enemy) 
 {
 	float miny = cy - 32;
 	float maxy = cy + height - 32;
@@ -1114,19 +1127,21 @@ void Hitbox(float cy, float height, double *pos0, double *pos1)
 	for (int i = 0; i < gl.nbullets; i++) {
 		//printf("gl.bullets[i].pos[1]: %f\n", gl.bullets[i].pos[1]);
 		//printf("pos1+miny: %f pos1+maxy: %f\n", (*pos1 + miny), (*pos1 + maxy));
-		if (gl.bullets[i].pos[0] >= *pos0+200 && gl.bullets[i].pos[0] <= *pos0+400
-			&& gl.bullets[i].pos[1] >= *pos1 + miny
-			&& gl.bullets[i].pos[1] <= *pos1 + maxy) {
-			gl.enemyChar.health -= 5;
-			if (gl.enemyChar.health <= 0) {
-			gl.enemyChar.pos[0] = -1000000;
-			gl.enemyChar.pos[1] = -1000000;
+		if (gl.bullets[i].pos[0] >= enemy->pos[0]+200 && gl.bullets[i].pos[0] <= enemy->pos[0]+300
+			&& gl.bullets[i].pos[1] >= enemy->pos[1] + miny
+			&& gl.bullets[i].pos[1] <= enemy->pos[1] + maxy) {
+				enemy->health -= 5;
+			if (enemy->health <= 0) {
+				enemy->pos[0] = -1000000;
+				enemy->pos[1] = -1000000;
 			}
 			gl.bullets[i] = gl.bullets[gl.nbullets - 1];
 			gl.nbullets--;
 		}
 	}
-	if (mainCharX >= *pos0+200 && mainCharX <= *pos0+400) {
+	if (mainCharX >= enemy->pos[0]+200 && mainCharX <= enemy->pos[0]+300
+			&& gl.mainChar.pos[1] >= enemy->pos[1] + miny
+			&& gl.mainChar.pos[1] <= enemy->pos[1] + maxy) {
 		gl.mainChar.health -= 1;
 		if (gl.mainChar.health <= 0) {
 			gl.state = STATE_GAMEOVER;
@@ -1134,13 +1149,13 @@ void Hitbox(float cy, float height, double *pos0, double *pos1)
 	}
 }
 
-void showHitbox(float cx, float cy, float height, float width, double *pos0, double *pos1) 
+void showHitbox(float cx, float cy, float height, float width, Sprite sprite) 
 {
 	float w = width;
 	float h = height;
 	glPushMatrix();
 	glColor3f(1.0, 0.0, 0.0);
-	glTranslated(*pos0, *pos1, 0);
+	glTranslated(sprite.pos[0], sprite.pos[1], 0);
 	glBegin(GL_LINE_LOOP);
 		glVertex2i(cx-w, cy-h);
 		glVertex2i(cx-w, cy+h);
@@ -1160,11 +1175,15 @@ void enemyPhysics() {
 		//printf("EnemyFrame: %i\n", gl.enemyFrame);
 			if (gl.enemyFrame <= 16) {
 				gl.enemyDirection = 1;
-				gl.enemyChar.pos[0] += 16;
+				for (int i = 0; i < 4; i++) {
+					gl.enemyChar[i].pos[0] += 16;
+				}
 			}
 			if (gl.enemyFrame < 32 && gl.enemyFrame > 16) {
 				gl.enemyDirection = 0;
-				gl.enemyChar.pos[0] -= 16;
+				for (int i = 0; i < 4; i++) {
+					gl.enemyChar[i].pos[0] -= 16;
+				}
 			}
 			if (gl.enemyFrame >= 32) {
 				gl.enemyFrame -= 32;
@@ -1174,15 +1193,15 @@ void enemyPhysics() {
 	}
 }
 
-void enemyHealthBar(float cx, float cy, double *pos0, double *pos1)
+void enemyHealthBar(float cx, float cy, Sprite *enemy)
 {
         Shape s;
         Shape box[200];
-        for (int i = 0; i < gl.enemyChar.health; i++) {
+        for (int i = 0; i < enemy->health; i++) {
                 box[i].width = 3;
                 box[i].height = 6;
-                box[i].center[0] = *pos0 + (i*6) - 30;
-                box[i].center[1] = *pos1 + 50;
+                box[i].center[0] = enemy->pos[0] + (i*6) - 30;
+                box[i].center[1] = enemy->pos[1] + 50;
                 box[i].center[2] = 0;
                 s = box[i];
                 glPushMatrix();
@@ -1200,14 +1219,14 @@ void enemyHealthBar(float cx, float cy, double *pos0, double *pos1)
         }	
 }
 
-void renderEnemy()
+void renderEnemy(Sprite *enemy)
 {
 	float cx = gl.xres/4.0;
 	float cy = gl.yres/4 -32; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
 	float h = 60.0;
 	float w = 48.0;
 	glPushMatrix();
-	glTranslated(gl.enemyChar.pos[0],gl.enemyChar.pos[1], 0);
+	glTranslated(enemy->pos[0], enemy->pos[1], 0);
 	glColor3f(1.0, 1.0, 1.0);
 	glBindTexture(GL_TEXTURE_2D, gl.enemyTexture);
 	glEnable(GL_ALPHA_TEST);
@@ -1235,9 +1254,9 @@ void renderEnemy()
 	glPopMatrix();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
-	showHitbox(cx, cy, h, w, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
-	Hitbox(cy, h, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
-	enemyHealthBar(cx, cy, &gl.enemyChar.pos[0], &gl.enemyChar.pos[1]);
+	showHitbox(cx, cy, h, w, *enemy);
+	Hitbox(cy, h, enemy);
+	enemyHealthBar(cx, cy, enemy);
 	//printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
 }
 
@@ -1454,8 +1473,10 @@ void render(void)
 	glPopMatrix();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
-	showHitbox(cx, cy, h, w, &gl.mainChar.pos[0], &gl.mainChar.pos[1]);
-	renderEnemy();
+	showHitbox(cx, cy, h, w, gl.mainChar);
+	for(int i=0; i < 4; i++) {
+		renderEnemy(&gl.enemyChar[i]);
+	}
 	renderFPS();
 	//==========================================================================
 	}
