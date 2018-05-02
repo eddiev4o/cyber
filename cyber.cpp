@@ -177,6 +177,7 @@ public:
 	Vec box[20];
 	Sprite mainChar;
 	Sprite enemyChar[10];
+	Sprite ammo[10];
 	double speed;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
@@ -206,6 +207,7 @@ public:
 	Ppmimage *gameoverImage;
 	Ppmimage *bluebackImage;
 	Ppmimage *endImage;
+	Ppmimage *ammoImage;
 	//---------------------------
 	//TEXTURES
 	//GLuint walkTexture;
@@ -218,6 +220,7 @@ public:
 	GLuint gameoverTexture;
 	GLuint bluebackTexture;
 	GLuint endTexture;
+	GLuint ammoTexture;
 	//---------------------------
 	~Global() {
 		delete [] bullets;
@@ -259,6 +262,7 @@ public:
 		bluebackImage=NULL;
 		gameoverImage=NULL;
 		endImage=NULL;
+		ammoImage=NULL;
 		//
 		delay = 0.05;
 		gameDelay = 0.01;
@@ -482,6 +486,7 @@ void initOpengl(void)
 	system("convert ./images/gameover.png ./images/gameover.ppm");
 	system("convert ./images/blueback.png ./images/blueback.ppm");
 	system("convert ./images/end.png ./images/end.ppm");
+	system("convert ./images/ammo.png ./images/ammo.ppm");
 	//=========================
 	// Get Images
 	//======================================
@@ -494,6 +499,7 @@ void initOpengl(void)
 	gl.gameoverImage = ppm6GetImage("./images/gameover.ppm");
 	gl.bluebackImage = ppm6GetImage("./images/blueback.ppm");
 	gl.endImage = ppm6GetImage("./images/end.ppm");
+	gl.ammoImage = ppm6GetImage("./images/ammo.ppm");
 	//=======================================
 	// Generate Textures
 	glGenTextures(1, &gl.cyberMenuTexture);
@@ -505,6 +511,7 @@ void initOpengl(void)
 	glGenTextures(1, &gl.gameoverTexture);
 	glGenTextures(1, &gl.bluebackTexture);
 	glGenTextures(1, &gl.endTexture);
+	glGenTextures(1, &gl.ammoTexture);
 	//======================================
 
 
@@ -636,7 +643,7 @@ void initOpengl(void)
 	free(bluebackData);
 	unlink("./images/blueback.ppm");
 	//------------------------------------------------------
-	//Game Over Texture
+	//End Game Texture
 	w = gl.endImage->width;
 	h = gl.endImage->height;
 	glBindTexture(GL_TEXTURE_2D, gl.endTexture);
@@ -647,6 +654,18 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, endData);
 	free(endData);
 	unlink("./images/end.ppm");
+	//------------------------------------------------------
+	//Ammo Texture
+	w = gl.ammoImage->width;
+	h = gl.ammoImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.ammoTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *ammoData = buildAlphaData(gl.ammoImage);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, ammoData);
+	free(ammoData);
+	unlink("./images/ammo.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -682,6 +701,8 @@ void init() {
 		gl.enemyChar[i].health = 10.0;
 		gl.enemyChar[i].health = 10.0;
 	}
+	gl.ammo[0].pos[0] = 500;
+	gl.ammo[0].pos[1] = 0;
 	gl.enemyChar[0].pos[0] = 768;
 	gl.enemyChar[0].pos[1] = 0.0;
 	gl.enemyChar[1].pos[0] = 1104;
@@ -922,6 +943,7 @@ void physics(void)
 			for (int i = 0; i < 9; i++) {
 				gl.enemyChar[i].pos[0] += gl.speed;
 			}
+			gl.ammo[0].pos[0] += gl.speed;
 			gl.bullets->direction = 1;
 		} else if (gl.keys[XK_Right] && gl.collisionR == 0) {
 			gl.camera[0] += gl.speed;
@@ -932,6 +954,7 @@ void physics(void)
 			for (int i = 0; i < 9; i++) {
 				gl.enemyChar[i].pos[0] -= gl.speed;
 			}
+			gl.ammo[0].pos[0] -= gl.speed;
 			gl.bullets->direction = 0;
 		}
 	}
@@ -1375,7 +1398,29 @@ void levelOver()
 		gl.state = STATE_STARTUP;
 	}
 }
-
+void renderAmmo(Sprite *ammo)
+{
+	float cx = gl.xres/4.0;
+	float cy = (gl.yres/4.0-32)-40.0; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
+	float h = 40.0;
+	float w = 40.0;
+	glPushMatrix();
+	glTranslated(ammo->pos[0], ammo->pos[1], 0);
+	glColor3f(1.0, 1.0, 1.0);
+	glBindTexture(GL_TEXTURE_2D, gl.ammoTexture);
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.0f);
+	glColor4ub(255,255,255,255);
+	glBegin(GL_QUADS);
+		glTexCoord2f(0.0, 1.0); glVertex2i(cx-w, cy-h);
+		glTexCoord2f(0.0, 0.0); glVertex2i(cx-w, cy+h);
+		glTexCoord2f(1.0, 0.0); glVertex2i(cx+w, cy+h); //tx+.125 orig
+		glTexCoord2f(1.0, 1.0); glVertex2i(cx+w, cy-h);
+	glEnd();
+	glPopMatrix();
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDisable(GL_ALPHA_TEST);
+}
 void renderFPS()
 {
 	Rect r;
@@ -1532,6 +1577,9 @@ void render(void)
 	showHitbox(cx, cy, h, w, gl.mainChar);
 	for(int i=0; i < 9; i++) {
 		renderEnemy(&gl.enemyChar[i]);
+	}
+	for(int i=0; i < 1; i++) {
+		renderAmmo(&gl.ammo[i]);
 	}
 	renderFPS();
 	if (gl.camera[0] >= 10000) {
