@@ -186,8 +186,6 @@ public:
 	double speed;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
-	Vec ball_pos;
-	Vec ball_vel;
 	Flt xc[2];
 	Flt yc[2];
 	int collisionL;
@@ -236,9 +234,6 @@ public:
 		underFlag = 0;
 		state = STATE_STARTUP;
 		camera[0] = camera[1] = 0.0;
-		ball_pos[0] = 500.0;
-		ball_pos[1] = ball_pos[2] = 0.0;
-		ball_vel[0] = ball_vel[1] = ball_vel[2] = 0.0;
 		done=0;
 		movie=0;
 		movieStep=2;
@@ -981,10 +976,6 @@ void physics(void)
 			gl.bullets->direction = 0;
 		}
 	}
-	//move the ball
-	gl.ball_pos[1] += gl.ball_vel[1];
-	gl.ball_vel[1] -= 1.0;
-	//=================================================
 	//=================================================
 	//Height Calculation
 	Flt dd = lev.ftsz[0];
@@ -1011,12 +1002,7 @@ void physics(void)
 	    	break;
 	    }
 	}
-	//height of ball is (nrows-1-i)*tile_height + starting point.
 	Flt h = lev.tilesize[1] * (lev.nrows-hgt) + lev.tile_base;
-	if (gl.ball_pos[1] <= h) {
-	    gl.ball_vel[1] = 0.0;
-	    gl.ball_pos[1] = h;
-	}
 	//End of height calculation
 	//==================================================
 	
