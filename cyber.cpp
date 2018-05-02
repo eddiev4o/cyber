@@ -41,6 +41,10 @@ typedef Flt Matrix[4][4];
 const float timeslice = 1.0f;
 const float gravity = -0.2f;
 const int MAX_BULLETS = 100;
+#ifdef USE_OPENAL_SOUND
+ALuint alBuffer[1];
+ALuint alSource[1];
+#endif //USE_OPENAL_SOUND
 #define ALPHA 1
 #define GRAVITY -0.5f
 //X Windows variables
@@ -71,6 +75,8 @@ void checkCollision(void);
 void tileCollision(Vec *tile);
 void emptyCollision(Vec *tile);
 void gameOver(void);
+void music(void);
+void deleteMusic(void);
 //-----------------------------------------------------------------------------
 //Setup timers
 class Timers {
@@ -338,6 +344,7 @@ int main(void)
 {
 	initXWindows();
 	initOpengl();
+	music();
 	while (!gl.done) {
 		while (XPending(dpy)) {
 			XEvent e;
@@ -358,6 +365,7 @@ int main(void)
 	}
 	cleanupXWindows();
 	cleanup_fonts();
+	deleteMusic();
 	return 0;
 }
 
@@ -907,6 +915,44 @@ Flt VecNormalize(Vec vec)
 	return(len);
 }
 
+void music()
+{
+#ifdef USE_OPENAL_SOUND
+	alutInit(0, NULL);
+	if (alGetError() != AL_NO_ERROR) {
+		printf("ERROR: alutInit()\n");
+		return;
+	}
+	alGetError();
+	float vec[6] = {0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f};
+	alListener3f(AL_POSITION, 0.0f, 0.0f, 0.0f);
+	alListenerfv(AL_ORIENTATION,vec);
+	alListenerf(AL_GAIN, 1.0f);
+	alBuffer[0] = alutCreateBufferFromFile("./sound/cyber.wav");
+	alGenSources(1, alSource);
+	alSourcei(alSource[0], AL_BUFFER, alBuffer[0]);
+	alSourcef(alSource[0], AL_GAIN, 0.3f);
+	alSourcef(alSource[0], AL_PITCH, 1.0f);
+	alSourcei(alSource[0], AL_LOOPING, AL_TRUE);
+	if (alGetError() != AL_NO_ERROR) {
+		printf("ERROR: setting source\n");
+		return;
+	}
+	alSourcePlay(alSource[0]);
+#endif //USE_OPENAL_SOUND
+	return;
+}
+void deleteMusic() {
+#ifdef USE_OPENAL_SOUND
+	alDeleteSources(1, &alSource[0]);
+    alDeleteBuffers(1, &alBuffer[0]);
+    ALCcontext *Context = alcGetCurrentContext();
+    ALCdevice *Device = alcGetContextsDevice(Context);
+    alcMakeContextCurrent(NULL);
+    alcDestroyContext(Context);
+    alcCloseDevice(Device);
+#endif //USE_OPENAL_SOUND
+}
 void StartJump() 
 {
 	if (gl.mainChar.onGround) {
