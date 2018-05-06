@@ -42,8 +42,8 @@ const float timeslice = 1.0f;
 const float gravity = -0.2f;
 const int MAX_BULLETS = 100;
 #ifdef USE_OPENAL_SOUND
-ALuint alBuffer[1];
-ALuint alSource[1];
+ALuint alBuffer[2];
+ALuint alSource[2];
 #endif //USE_OPENAL_SOUND
 #define ALPHA 1
 #define GRAVITY -0.5f
@@ -903,7 +903,8 @@ void music()
 	alListenerfv(AL_ORIENTATION,vec);
 	alListenerf(AL_GAIN, 1.0f);
 	alBuffer[0] = alutCreateBufferFromFile("./sound/cyber.wav");
-	alGenSources(1, alSource);
+	alBuffer[1] = alutCreateBufferFromFile("./sound/gunshot.wav");
+	alGenSources(2, alSource);
 	alSourcei(alSource[0], AL_BUFFER, alBuffer[0]);
 	alSourcef(alSource[0], AL_GAIN, 0.3f);
 	alSourcef(alSource[0], AL_PITCH, 1.0f);
@@ -920,6 +921,8 @@ void deleteMusic() {
 #ifdef USE_OPENAL_SOUND
 	alDeleteSources(1, &alSource[0]);
     alDeleteBuffers(1, &alBuffer[0]);
+	alDeleteSources(1, &alSource[1]);
+    alDeleteBuffers(1, &alBuffer[1]);
     ALCcontext *Context = alcGetCurrentContext();
     ALCdevice *Device = alcGetContextsDevice(Context);
     alcMakeContextCurrent(NULL);
@@ -930,13 +933,13 @@ void deleteMusic() {
 void StartJump() 
 {
 	if (gl.mainChar.onGround) {
-		gl.mainChar.vel[1] = 14.0;
+		gl.mainChar.vel[1] = 12.0;
 		gl.mainChar.onGround = false;
 	}
 }
 void EndJump() 
 {
-	if (gl.mainChar.vel[1] > 7.0)
+	if (gl.mainChar.vel[1] > 6.0)
 		gl.mainChar.vel[1] = 10.0;
 }
 
@@ -1143,7 +1146,14 @@ void bullets() {
 	gl.bullets[gl.nbullets].velocity = gl.bulletVelocity;
 	gl.bullets[gl.nbullets].direction = gl.bullets->direction;
 	gl.nbullets++;
+#ifdef USE_OPENAL_SOUND
+	alSourcei(alSource[1], AL_BUFFER, alBuffer[1]);
+	alSourcef(alSource[1], AL_GAIN, 0.3f);
+	alSourcef(alSource[1], AL_PITCH, 1.0f);
+	alSourcei(alSource[1], AL_LOOPING, AL_FALSE);
+	alSourcePlay(alSource[1]);
 	//printf("bullet made\n");
+#endif
 }
 
 void healthBar()
