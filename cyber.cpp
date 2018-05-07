@@ -42,7 +42,7 @@ const float timeslice = 1.0f;
 const float gravity = -0.2f;
 const int MAX_BULLETS = 100;
 const int MAX_ENEMY = 26;
-const int MAX_DRONE = 2;
+const int MAX_DRONE = 6;
 #ifdef USE_OPENAL_SOUND
 ALuint alBuffer[2];
 ALuint alSource[2];
@@ -93,6 +93,7 @@ public:
 	struct timespec enemyTime;
 	struct timespec droneTime;
 	struct timespec frameTime;
+	struct timespec bulletTime;
 	struct timespec httpTime;
 	struct timespec gameoverTime;
 	Timers() {
@@ -182,6 +183,7 @@ public:
 	int walkFrame;
 	int enemyFrame;
 	int droneFrame;
+	int bulletFrame;
 	int httpFrame;
 	double fps;
 	int gameoverFrame;
@@ -301,14 +303,13 @@ public:
 		nbullets = 0;
 		bulletWidth = 4;
 		bulletHeight = 2;
-		clock_gettime(CLOCK_REALTIME, &bulletTimer);
+		bulletFrame = 0;
 
 		beams = new Bullet[MAX_BULLETS];
 		beamVelocity = 10;
 		nbeams = 0;
 		beamWidth = 4;
 		beamHeight = 4;
-		clock_gettime(CLOCK_REALTIME, &beamTimer);
 	}
 } gl;
 
@@ -742,6 +743,10 @@ void init() {
 	//DRONE
 	gl.droneChar[0].pos[0] = 1524;	gl.droneChar[0].pos[1] = 300.0;
 	gl.droneChar[1].pos[0] = 2120;	gl.droneChar[1].pos[1] = 300.0;
+	gl.droneChar[2].pos[0] = 8182;	gl.droneChar[2].pos[1] = 300.0;
+	gl.droneChar[3].pos[0] = 8512;	gl.droneChar[3].pos[1] = 300.0;
+	gl.droneChar[4].pos[0] = 8845;	gl.droneChar[4].pos[1] = 300.0;
+	gl.droneChar[5].pos[0] = 9252;	gl.droneChar[5].pos[1] = 300.0;
 	//ENEMY
 	gl.enemyChar[0].pos[0] = 768;	gl.enemyChar[0].pos[1] = 0.0;
 	gl.enemyChar[1].pos[0] = 1104;	gl.enemyChar[1].pos[1] = 224.0;
@@ -909,9 +914,20 @@ void checkKeys(XEvent *e)
 			break;
 		case XK_f:
 			break;
-		case XK_space:
-			bullets();
+		case XK_space: {
+			timers.recordTime(&timers.timeCurrent);
+			double timeSpan = timers.timeDiff(&timers.bulletTime, &timers.timeCurrent);
+			if (timeSpan > 0.10) { 
+				++gl.bulletFrame;
+				if (gl.bulletFrame > 2)
+					gl.bulletFrame -= 2;
+				timers.recordTime(&timers.bulletTime);
+			}
+			if (gl.bulletFrame < 2 ) {
+			    bullets();
+			}
 			break;
+		}
 		case XK_Left:
 			break;
 		case XK_Right:
