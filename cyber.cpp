@@ -70,6 +70,7 @@ void EndJump(void);
 void bullets(void);
 void bulletPhysics(void);
 void enemyPhysics(void);
+void dronePhysics(void);
 void shootbullets(void);
 void checkCollision(void);
 void tileCollision(Vec *tile);
@@ -77,6 +78,8 @@ void emptyCollision(Vec *tile);
 void gameOver(void);
 void music(void);
 void deleteMusic(void);
+void beams(void);
+void droneHitbox(void);
 //-----------------------------------------------------------------------------
 //Setup timers
 class Timers {
@@ -86,6 +89,7 @@ public:
 	struct timespec timeStart, timeEnd, timeCurrent;
 	struct timespec walkTime;
 	struct timespec enemyTime;
+	struct timespec droneTime;
 	struct timespec frameTime;
 	struct timespec httpTime;
 	struct timespec gameoverTime;
@@ -153,6 +157,7 @@ public:
 void showHitbox(float, float, float, float, Sprite);
 void Hitbox(float, float, Sprite*);
 void enemyHealthBar(float, float, Sprite*);
+void makeBeams(Sprite *);
 
 enum State {
 	STATE_NONE,
@@ -174,6 +179,7 @@ public:
 	int walk;
 	int walkFrame;
 	int enemyFrame;
+	int droneFrame;
 	int httpFrame;
 	double fps;
 	int gameoverFrame;
@@ -183,6 +189,7 @@ public:
 	Vec box[20];
 	Sprite mainChar;
 	Sprite enemyChar[10];
+	Sprite droneChar[10];
 	double speed;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
@@ -190,6 +197,7 @@ public:
 	Flt yc[2];
 	int collisionL;
 	int collisionR;
+	
 	//Bullets
 	Bullet *bullets;
 	int nbullets;
@@ -197,8 +205,17 @@ public:
 	struct timespec bulletTimer;		
 	float bulletWidth;
 	float bulletHeight;
+	//Beams
+	Bullet *beams;
+	int nbeams;
+	float beamVelocity;
+	struct timespec beamTimer;		
+	float beamWidth;
+	float beamHeight;
+
 	int direction;
 	int enemyDirection;
+	int droneDirection;
 	int underFlag;
 	//PPM IMAGES
 	Ppmimage *cyberMenuImage;
@@ -206,6 +223,7 @@ public:
 	Ppmimage *floorImage;
 	Ppmimage *platformImage;
 	Ppmimage *enemyImage;
+	Ppmimage *droneImage;
 	Ppmimage *creditsImage;
 	Ppmimage *gameoverImage;
 	Ppmimage *bluebackImage;
@@ -218,6 +236,7 @@ public:
 	GLuint floorTexture;
 	GLuint platformTexture;
 	GLuint enemyTexture;
+	GLuint droneTexture;
 	GLuint creditsTexture;
 	GLuint gameoverTexture;
 	GLuint bluebackTexture;
@@ -225,6 +244,7 @@ public:
 	//---------------------------
 	~Global() {
 		delete [] bullets;
+		delete [] beams;
 		logClose();
 	}
 	Global() {
@@ -242,10 +262,12 @@ public:
 		walk=0;
 		direction=1;
 		enemyDirection=1;
+		droneDirection=0;
 		httpFrame=0;
 		walkFrame=0;
 		gameoverFrame=0;
 		enemyFrame=0;
+		droneFrame=0;
 		fps=0;
 		countdown = 10;
 		speed = 2.25;
@@ -256,6 +278,7 @@ public:
 		floorImage=NULL;
 		platformImage=NULL;
 		enemyImage=NULL;
+		droneImage=NULL;
 		creditsImage=NULL;
 		bluebackImage=NULL;
 		gameoverImage=NULL;
@@ -277,6 +300,13 @@ public:
 		bulletWidth = 4;
 		bulletHeight = 2;
 		clock_gettime(CLOCK_REALTIME, &bulletTimer);
+
+		beams = new Bullet[MAX_BULLETS];
+		beamVelocity = 10;
+		nbeams = 0;
+		beamWidth = 4;
+		beamHeight = 4;
+		clock_gettime(CLOCK_REALTIME, &beamTimer);
 	}
 } gl;
 
@@ -350,6 +380,7 @@ int main(void)
 		if(gl.state == STATE_GAMEPLAY) {	
 			physics();
 			enemyPhysics();
+			dronePhysics();
 		}
 		render();
 		glXSwapBuffers(dpy, win);
@@ -481,6 +512,7 @@ void initOpengl(void)
 	system("convert ./images/floor.png ./images/floor.ppm");
 	system("convert ./images/platform.png ./images/platform.ppm");
 	system("convert ./images/enemy.gif ./images/enemy.ppm");
+	system("convert ./images/drone.gif ./images/drone.ppm");
 	system("convert ./images/credits.png ./images/credits.ppm");
 	system("convert ./images/gameover.png ./images/gameover.ppm");
 	system("convert ./images/blueback.png ./images/blueback.ppm");
@@ -493,6 +525,7 @@ void initOpengl(void)
 	gl.floorImage = ppm6GetImage("./images/floor.ppm");
 	gl.platformImage = ppm6GetImage("./images/platform.ppm");
 	gl.enemyImage = ppm6GetImage("./images/enemy.ppm");
+	gl.droneImage = ppm6GetImage("./images/drone.ppm");
 	gl.creditsImage = ppm6GetImage("./images/credits.ppm");
 	gl.gameoverImage = ppm6GetImage("./images/gameover.ppm");
 	gl.bluebackImage = ppm6GetImage("./images/blueback.ppm");
@@ -504,6 +537,7 @@ void initOpengl(void)
 	glGenTextures(1, &gl.floorTexture);
 	glGenTextures(1, &gl.platformTexture);
 	glGenTextures(1, &gl.enemyTexture);
+	glGenTextures(1, &gl.droneTexture);
 	glGenTextures(1, &gl.creditsTexture);
 	glGenTextures(1, &gl.gameoverTexture);
 	glGenTextures(1, &gl.bluebackTexture);
@@ -650,6 +684,18 @@ void initOpengl(void)
 		GL_RGBA, GL_UNSIGNED_BYTE, endData);
 	free(endData);
 	unlink("./images/end.ppm");
+	//------------------------------------------------------
+	//Enemy Drone Texture 
+	w = gl.droneImage->width;
+	h = gl.droneImage->height;
+	glBindTexture(GL_TEXTURE_2D, gl.droneTexture);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	unsigned char *droneData = buildAlphaData(gl.droneImage);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, droneData);
+	free(droneData);
+	unlink("./images/drone.ppm");
 }
 
 void checkResize(XEvent *e)
@@ -677,6 +723,7 @@ void init() {
 	gl.mainChar.health = 20.0;
 	gl.walkFrame = 0;
 	gl.enemyFrame = 0;
+	gl.droneFrame = 0;
 	gl.gameoverFrame = 0;
 	for (int i = 0; i < 10; i++) {	
 		gl.enemyChar[i].vel[0] = 0.0;
@@ -684,25 +731,25 @@ void init() {
 		gl.enemyChar[i].onGround = false;
 		gl.enemyChar[i].health = 10.0;
 		gl.enemyChar[i].health = 10.0;
+		gl.droneChar[i].vel[0] = 0.0;
+		gl.droneChar[i].vel[1] = 0.0;
+		gl.droneChar[i].onGround = false;
+		gl.droneChar[i].health = 10.0;
+		gl.droneChar[i].health = 10.0;
 	}
-	gl.enemyChar[0].pos[0] = 768;
-	gl.enemyChar[0].pos[1] = 0.0;
-	gl.enemyChar[1].pos[0] = 1104;
-	gl.enemyChar[1].pos[1] = 224.0;
-	gl.enemyChar[2].pos[0] = 1424;
-	gl.enemyChar[2].pos[1] = 0.0;
-	gl.enemyChar[3].pos[0] = 1920;
-	gl.enemyChar[3].pos[1] = 0.0;
-	gl.enemyChar[4].pos[0] = 2240;
-	gl.enemyChar[4].pos[1] = 0.0;
-	gl.enemyChar[5].pos[0] = 2560;
-	gl.enemyChar[5].pos[1] = 0.0;
-	gl.enemyChar[6].pos[0] = 3072;
-	gl.enemyChar[6].pos[1] = 64.0;
-	gl.enemyChar[7].pos[0] = 5216;
-	gl.enemyChar[7].pos[1] = 0.0;
-	gl.enemyChar[8].pos[0] = 5536;
-	gl.enemyChar[8].pos[1] = 0.0;
+	//DRONE
+	gl.droneChar[0].pos[0] = 1524;	gl.droneChar[0].pos[1] = 300.0;
+	gl.droneChar[1].pos[0] = 2120;	gl.droneChar[1].pos[1] = 300.0;
+	//ENEMY
+	gl.enemyChar[0].pos[0] = 768;	gl.enemyChar[0].pos[1] = 0.0;
+	gl.enemyChar[1].pos[0] = 1104;	gl.enemyChar[1].pos[1] = 224.0;
+	gl.enemyChar[2].pos[0] = 1424;	gl.enemyChar[2].pos[1] = 0.0;
+	gl.enemyChar[3].pos[0] = 1920;	gl.enemyChar[3].pos[1] = 0.0;
+	gl.enemyChar[4].pos[0] = 2240;	gl.enemyChar[4].pos[1] = 0.0;
+	gl.enemyChar[5].pos[0] = 2560;	gl.enemyChar[5].pos[1] = 0.0;
+	gl.enemyChar[6].pos[0] = 3072;	gl.enemyChar[6].pos[1] = 64.0;
+	gl.enemyChar[7].pos[0] = 5216;	gl.enemyChar[7].pos[1] = 0.0;
+	gl.enemyChar[8].pos[0] = 5536;	gl.enemyChar[8].pos[1] = 0.0;
 }
 
 void checkMouse(XEvent *e)
@@ -965,6 +1012,10 @@ void physics(void)
 			gl.xc[1] -= 0.00002;
 			for (int i = 0; i < 9; i++) {
 				gl.enemyChar[i].pos[0] += gl.speed;
+				gl.droneChar[i].pos[0] += gl.speed;
+			}
+			for (int i = 0; i < gl.nbeams; i++) {
+				gl.beams[i].pos[0] += gl.speed;
 			}
 			gl.bullets->direction = 1;
 		} else if (gl.keys[XK_Right] && gl.collisionR == 0) {
@@ -975,6 +1026,10 @@ void physics(void)
 			gl.xc[1] += 0.0002;
 			for (int i = 0; i < 9; i++) {
 				gl.enemyChar[i].pos[0] -= gl.speed;
+				gl.droneChar[i].pos[0] -= gl.speed;
+			}
+			for (int i = 0; i < gl.nbeams; i++) {
+				gl.beams[i].pos[0] -= gl.speed;
 			}
 			gl.bullets->direction = 0;
 		}
@@ -1218,6 +1273,22 @@ void Hitbox(float cy, float height, Sprite *enemy)
 	}
 }
 
+void droneHitbox() {
+	float maxx = gl.xres/4.0+gl.mainChar.spritex/2;
+	float minx = (gl.xres/4.0)-gl.mainChar.spritex/2;
+	for (int i = 0; i < gl.nbeams; i++) {
+		if(gl.beams[i].pos[1] <= gl.mainChar.pos[1]+32 &&
+		gl.beams[i].pos[0] >= minx && gl.beams[i].pos[0] <= maxx) {
+			if (gl.mainChar.health <= 0) {
+				gl.state = STATE_GAMEOVER;
+			}
+			gl.mainChar.health -= 1;
+			gl.beams[i] = gl.beams[gl.nbeams - 1];
+			gl.nbeams--;
+		} 
+	}
+}
+
 void showHitbox(float cx, float cy, float height, float width, Sprite sprite) 
 {
 	float w = width;
@@ -1260,6 +1331,107 @@ void enemyPhysics() {
 		timers.recordTime(&timers.enemyTime);
 		}
 	}
+}
+
+void dronePhysics() {
+	if (gl.state == STATE_GAMEPLAY) {
+		timers.recordTime(&timers.timeCurrent);
+		double timeSpan = timers.timeDiff(&timers.droneTime, &timers.timeCurrent);
+		if (timeSpan > 0.18) { //gameDelay orig
+		//advance
+		++gl.droneFrame;
+		//printf("EnemyFrame: %i\n", gl.enemyFrame);
+			if (gl.droneFrame <= 16) {
+				gl.droneDirection = 0;
+				for (int i = 0; i < 9; i++) {
+					gl.droneChar[i].pos[0] += 16;
+				}
+			}
+			if (gl.droneFrame < 32 && gl.droneFrame > 16) {
+				gl.droneDirection = 1;
+				for (int i = 0; i < 9; i++) {
+					gl.droneChar[i].pos[0] -= 16;
+					makeBeams(&gl.droneChar[i]);
+				}
+			}
+			if (gl.droneFrame >= 32) {
+				gl.droneFrame -= 32;
+			}
+		timers.recordTime(&timers.droneTime);
+		}
+	}
+}
+
+void beams () {	
+	for (int i = 0; i < gl.nbeams; i++) {
+		glPushMatrix();
+		glColor3f(1.0,0.0,0.0);
+		glTranslatef(gl.beams[i].pos[0], gl.beams[i].pos[1], 0);
+		float w = gl.beamWidth;	
+		float h = gl.beamHeight;
+		glBegin(GL_QUADS);
+			glVertex2i(-w, -h);	
+			glVertex2i(-w, h);	
+			glVertex2i(w, h);	
+			glVertex2i(w, -h);
+		glEnd();
+		glPopMatrix();
+		gl.beams[i].pos[1] = gl.beams[i].pos[1] - gl.beams[i].velocity;	
+		if (gl.beams[i].pos[1] < 0) {
+			gl.beams[i] = gl.beams[gl.nbeams - 1];
+			gl.nbeams--;
+		}	
+	}
+}
+void makeBeams(Sprite *drone) {
+	for (int i=0; i < gl.nbeams; i++) {
+	gl.beams[gl.nbeams].pos[0] = drone->pos[0]+232;
+	gl.beams[gl.nbeams].pos[1] = drone->pos[1]+128;
+	}
+	gl.beams[gl.nbeams].velocity = gl.beamVelocity;
+	gl.beams[gl.nbeams].direction = gl.beams->direction;
+	gl.nbeams++;
+}
+
+void renderDrone(Sprite *drone)
+{
+	float cx = gl.xres/4.0;
+	float cy = gl.yres/4 -32; //(gl.yres/gl.yres) to test tiles //gl.xres/4.0 original
+	float h = 60.0;
+	float w = 48.0;
+	glPushMatrix();
+	glTranslated(drone->pos[0], drone->pos[1], 0);
+	glColor3f(1.0, 1.0, 1.0);
+	glBindTexture(GL_TEXTURE_2D, gl.droneTexture);
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.0f);
+	glColor4ub(255,255,255,255);
+	int ix = gl.droneFrame % 16; //8.0
+	int iy = 0;
+	if (gl.droneFrame >= 4) //8.0
+		iy = 1;
+	float tx = (float)ix / 4.0; //8.0 orig
+	float ty = (float)iy / 2.0;
+	glBegin(GL_QUADS);
+		if (gl.droneDirection) {
+			glTexCoord2f(tx,      ty+.5); glVertex2i(cx-w, cy-h);
+			glTexCoord2f(tx,      ty);    glVertex2i(cx-w, cy+h);
+			glTexCoord2f(tx+.250, ty);    glVertex2i(cx+w, cy+h); //tx+.125 orig
+			glTexCoord2f(tx+.250, ty+.5); glVertex2i(cx+w, cy-h);
+		} else {
+			glTexCoord2f(tx+.250, ty+.5); glVertex2i(cx-w, cy-h);
+			glTexCoord2f(tx+.250, ty);    glVertex2i(cx-w, cy+h);
+			glTexCoord2f(tx,      ty);    glVertex2i(cx+w, cy+h);
+			glTexCoord2f(tx,      ty+.5); glVertex2i(cx+w, cy-h);
+		}
+	glEnd();
+	glPopMatrix();
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDisable(GL_ALPHA_TEST);
+	showHitbox(cx, cy, h, w, *drone);
+	Hitbox(cy, h, drone);
+	enemyHealthBar(cx, cy, drone);
+	//printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
 }
 
 void enemyHealthBar(float cx, float cy, Sprite *enemy)
@@ -1326,6 +1498,7 @@ void renderEnemy(Sprite *enemy)
 	showHitbox(cx, cy, h, w, *enemy);
 	Hitbox(cy, h, enemy);
 	enemyHealthBar(cx, cy, enemy);
+	droneHitbox();
 	//printf("gl.enemyChar.pos[0]: %f\n", gl.enemyChar.pos[0]);
 }
 
@@ -1527,6 +1700,7 @@ void render(void)
 	//===================================
 	healthBar();
 	bulletPhysics();
+	beams();
 
 	//===================================
 	// CHARACTER SPRITE
@@ -1572,6 +1746,9 @@ void render(void)
 	showHitbox(cx, cy, h, w, gl.mainChar);
 	for(int i=0; i < 9; i++) {
 		renderEnemy(&gl.enemyChar[i]);
+	}
+	for(int i=0; i < 2; i++) {
+		renderDrone(&gl.droneChar[i]);
 	}
 	renderFPS();
 	if (gl.camera[0] >= 10000) {
