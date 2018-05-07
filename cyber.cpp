@@ -729,12 +729,10 @@ void init() {
 		gl.enemyChar[i].vel[0] = 0.0;
 		gl.enemyChar[i].vel[1] = 0.0;
 		gl.enemyChar[i].onGround = false;
-		gl.enemyChar[i].health = 10.0;
-		gl.enemyChar[i].health = 10.0;
+		gl.enemyChar[i].health = 12.0;
 		gl.droneChar[i].vel[0] = 0.0;
 		gl.droneChar[i].vel[1] = 0.0;
 		gl.droneChar[i].onGround = false;
-		gl.droneChar[i].health = 10.0;
 		gl.droneChar[i].health = 10.0;
 	}
 	//DRONE
@@ -748,8 +746,10 @@ void init() {
 	gl.enemyChar[4].pos[0] = 2240;	gl.enemyChar[4].pos[1] = 0.0;
 	gl.enemyChar[5].pos[0] = 2560;	gl.enemyChar[5].pos[1] = 0.0;
 	gl.enemyChar[6].pos[0] = 3072;	gl.enemyChar[6].pos[1] = 64.0;
-	gl.enemyChar[7].pos[0] = 5216;	gl.enemyChar[7].pos[1] = 0.0;
-	gl.enemyChar[8].pos[0] = 5536;	gl.enemyChar[8].pos[1] = 0.0;
+	gl.enemyChar[7].pos[0] = 3572;	gl.enemyChar[7].pos[1] = 0.0;
+	gl.enemyChar[8].pos[0] = 4072;	gl.enemyChar[8].pos[1] = 0.0;
+	//gl.enemyChar[8].pos[0] = 5216;	gl.enemyChar[8].pos[1] = 0.0;
+	//gl.enemyChar[].pos[0] = 5536;	gl.enemyChar[].pos[1] = 0.0;
 }
 
 void checkMouse(XEvent *e)
@@ -1012,6 +1012,8 @@ void physics(void)
 			gl.xc[1] -= 0.00002;
 			for (int i = 0; i < 9; i++) {
 				gl.enemyChar[i].pos[0] += gl.speed;
+			}
+			for (int i = 0; i < 2; i++) {
 				gl.droneChar[i].pos[0] += gl.speed;
 			}
 			for (int i = 0; i < gl.nbeams; i++) {
@@ -1026,6 +1028,8 @@ void physics(void)
 			gl.xc[1] += 0.0002;
 			for (int i = 0; i < 9; i++) {
 				gl.enemyChar[i].pos[0] -= gl.speed;
+			}
+			for (int i = 0; i < 2; i++) {
 				gl.droneChar[i].pos[0] -= gl.speed;
 			}
 			for (int i = 0; i < gl.nbeams; i++) {
@@ -1319,14 +1323,14 @@ void enemyPhysics() {
 					gl.enemyChar[i].pos[0] += 16;
 				}
 			}
-			if (gl.enemyFrame < 32 && gl.enemyFrame > 16) {
+			if (gl.enemyFrame < 33 && gl.enemyFrame > 16) {
 				gl.enemyDirection = 0;
 				for (int i = 0; i < 9; i++) {
 					gl.enemyChar[i].pos[0] -= 16;
 				}
 			}
-			if (gl.enemyFrame >= 32) {
-				gl.enemyFrame -= 32;
+			if (gl.enemyFrame >= 33) {
+				gl.enemyFrame -= 33;
 			}
 		timers.recordTime(&timers.enemyTime);
 		}
@@ -1343,19 +1347,19 @@ void dronePhysics() {
 		//printf("EnemyFrame: %i\n", gl.enemyFrame);
 			if (gl.droneFrame <= 16) {
 				gl.droneDirection = 0;
-				for (int i = 0; i < 9; i++) {
+				for (int i = 0; i < 2; i++) {
 					gl.droneChar[i].pos[0] += 16;
 				}
 			}
-			if (gl.droneFrame < 32 && gl.droneFrame > 16) {
+			if (gl.droneFrame < 33 && gl.droneFrame > 16) {
 				gl.droneDirection = 1;
-				for (int i = 0; i < 9; i++) {
+				for (int i = 0; i < 2; i++) {
 					gl.droneChar[i].pos[0] -= 16;
 					makeBeams(&gl.droneChar[i]);
 				}
 			}
-			if (gl.droneFrame >= 32) {
-				gl.droneFrame -= 32;
+			if (gl.droneFrame >= 33) {
+				gl.droneFrame -= 33;
 			}
 		timers.recordTime(&timers.droneTime);
 		}
