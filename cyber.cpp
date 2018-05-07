@@ -41,6 +41,8 @@ typedef Flt Matrix[4][4];
 const float timeslice = 1.0f;
 const float gravity = -0.2f;
 const int MAX_BULLETS = 100;
+const int MAX_ENEMY = 26;
+const int MAX_DRONE = 2;
 #ifdef USE_OPENAL_SOUND
 ALuint alBuffer[2];
 ALuint alSource[2];
@@ -188,8 +190,8 @@ public:
 	double gameDelay;
 	Vec box[20];
 	Sprite mainChar;
-	Sprite enemyChar[10];
-	Sprite droneChar[10];
+	Sprite enemyChar[MAX_ENEMY];
+	Sprite droneChar[MAX_DRONE];
 	double speed;
 	//camera is centered at (0,0) lower-left of screen. 
 	Flt camera[2];
@@ -725,11 +727,13 @@ void init() {
 	gl.enemyFrame = 0;
 	gl.droneFrame = 0;
 	gl.gameoverFrame = 0;
-	for (int i = 0; i < 10; i++) {	
+	for (int i = 0; i < MAX_ENEMY; i++) {	
 		gl.enemyChar[i].vel[0] = 0.0;
 		gl.enemyChar[i].vel[1] = 0.0;
 		gl.enemyChar[i].onGround = false;
 		gl.enemyChar[i].health = 12.0;
+	}
+	for (int i = 0; i < MAX_DRONE; i++) {
 		gl.droneChar[i].vel[0] = 0.0;
 		gl.droneChar[i].vel[1] = 0.0;
 		gl.droneChar[i].onGround = false;
@@ -748,8 +752,23 @@ void init() {
 	gl.enemyChar[6].pos[0] = 3072;	gl.enemyChar[6].pos[1] = 64.0;
 	gl.enemyChar[7].pos[0] = 3572;	gl.enemyChar[7].pos[1] = 0.0;
 	gl.enemyChar[8].pos[0] = 4072;	gl.enemyChar[8].pos[1] = 0.0;
-	//gl.enemyChar[8].pos[0] = 5216;	gl.enemyChar[8].pos[1] = 0.0;
-	//gl.enemyChar[].pos[0] = 5536;	gl.enemyChar[].pos[1] = 0.0;
+	gl.enemyChar[9].pos[0] = 4392;	gl.enemyChar[9].pos[1] = 0.0;
+	gl.enemyChar[10].pos[0] = 4592;	gl.enemyChar[10].pos[1] = 0.0;
+	gl.enemyChar[11].pos[0] = 5216;	gl.enemyChar[11].pos[1] = 0.0;
+	gl.enemyChar[12].pos[0] = 5536;	gl.enemyChar[12].pos[1] = 0.0;
+	gl.enemyChar[13].pos[0] = 5868;	gl.enemyChar[13].pos[1] = 0.0;
+	gl.enemyChar[14].pos[0] = 6260;	gl.enemyChar[14].pos[1] = 0.0;
+	gl.enemyChar[15].pos[0] = 6360;	gl.enemyChar[15].pos[1] = 0.0;
+	gl.enemyChar[16].pos[0] = 6460;	gl.enemyChar[16].pos[1] = 0.0;
+	gl.enemyChar[17].pos[0] = 6560;	gl.enemyChar[17].pos[1] = 0.0;
+	gl.enemyChar[18].pos[0] = 6660;	gl.enemyChar[18].pos[1] = 0.0;
+	gl.enemyChar[19].pos[0] = 6760;	gl.enemyChar[19].pos[1] = 0.0;
+	gl.enemyChar[20].pos[0] = 6860;	gl.enemyChar[20].pos[1] = 0.0;
+	gl.enemyChar[21].pos[0] = 6960;	gl.enemyChar[21].pos[1] = 0.0;
+	gl.enemyChar[22].pos[0] = 7060;	gl.enemyChar[22].pos[1] = 0.0;
+	gl.enemyChar[23].pos[0] = 7160;	gl.enemyChar[23].pos[1] = 0.0;
+	gl.enemyChar[24].pos[0] = 7260;	gl.enemyChar[24].pos[1] = 0.0;
+	gl.enemyChar[25].pos[0] = 7360;	gl.enemyChar[25].pos[1] = 0.0;
 }
 
 void checkMouse(XEvent *e)
@@ -1010,10 +1029,10 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] -= 0.00002;
 			gl.xc[1] -= 0.00002;
-			for (int i = 0; i < 9; i++) {
+			for (int i = 0; i < MAX_ENEMY; i++) {
 				gl.enemyChar[i].pos[0] += gl.speed;
 			}
-			for (int i = 0; i < 2; i++) {
+			for (int i = 0; i < MAX_DRONE; i++) {
 				gl.droneChar[i].pos[0] += gl.speed;
 			}
 			for (int i = 0; i < gl.nbeams; i++) {
@@ -1026,10 +1045,10 @@ void physics(void)
 				gl.camera[0] = 0.0;
 			gl.xc[0] += 0.0002;
 			gl.xc[1] += 0.0002;
-			for (int i = 0; i < 9; i++) {
+			for (int i = 0; i < MAX_ENEMY; i++) {
 				gl.enemyChar[i].pos[0] -= gl.speed;
 			}
-			for (int i = 0; i < 2; i++) {
+			for (int i = 0; i < MAX_DRONE; i++) {
 				gl.droneChar[i].pos[0] -= gl.speed;
 			}
 			for (int i = 0; i < gl.nbeams; i++) {
@@ -1319,13 +1338,13 @@ void enemyPhysics() {
 		//printf("EnemyFrame: %i\n", gl.enemyFrame);
 			if (gl.enemyFrame <= 16) {
 				gl.enemyDirection = 1;
-				for (int i = 0; i < 9; i++) {
+				for (int i = 0; i < MAX_ENEMY; i++) {
 					gl.enemyChar[i].pos[0] += 16;
 				}
 			}
 			if (gl.enemyFrame < 33 && gl.enemyFrame > 16) {
 				gl.enemyDirection = 0;
-				for (int i = 0; i < 9; i++) {
+				for (int i = 0; i < MAX_ENEMY; i++) {
 					gl.enemyChar[i].pos[0] -= 16;
 				}
 			}
@@ -1347,13 +1366,13 @@ void dronePhysics() {
 		//printf("EnemyFrame: %i\n", gl.enemyFrame);
 			if (gl.droneFrame <= 16) {
 				gl.droneDirection = 0;
-				for (int i = 0; i < 2; i++) {
+				for (int i = 0; i < MAX_DRONE; i++) {
 					gl.droneChar[i].pos[0] += 16;
 				}
 			}
 			if (gl.droneFrame < 33 && gl.droneFrame > 16) {
 				gl.droneDirection = 1;
-				for (int i = 0; i < 2; i++) {
+				for (int i = 0; i < MAX_DRONE; i++) {
 					gl.droneChar[i].pos[0] -= 16;
 					makeBeams(&gl.droneChar[i]);
 				}
@@ -1748,10 +1767,10 @@ void render(void)
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_ALPHA_TEST);
 	showHitbox(cx, cy, h, w, gl.mainChar);
-	for(int i=0; i < 9; i++) {
+	for(int i=0; i < MAX_ENEMY; i++) {
 		renderEnemy(&gl.enemyChar[i]);
 	}
-	for(int i=0; i < 2; i++) {
+	for(int i=0; i < MAX_DRONE; i++) {
 		renderDrone(&gl.droneChar[i]);
 	}
 	renderFPS();
