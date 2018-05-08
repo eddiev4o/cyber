@@ -42,7 +42,7 @@ const float timeslice = 1.0f;
 const float gravity = -0.2f;
 const int MAX_BULLETS = 100;
 const int MAX_ENEMY = 26;
-const int MAX_DRONE = 6;
+const int MAX_DRONE = 7;
 #ifdef USE_OPENAL_SOUND
 ALuint alBuffer[2];
 ALuint alSource[2];
@@ -728,6 +728,7 @@ void init() {
 	gl.enemyFrame = 0;
 	gl.droneFrame = 0;
 	gl.gameoverFrame = 0;
+	gl.countdown = 10;
 	for (int i = 0; i < MAX_ENEMY; i++) {	
 		gl.enemyChar[i].vel[0] = 0.0;
 		gl.enemyChar[i].vel[1] = 0.0;
@@ -747,6 +748,7 @@ void init() {
 	gl.droneChar[3].pos[0] = 8512;	gl.droneChar[3].pos[1] = 300.0;
 	gl.droneChar[4].pos[0] = 8845;	gl.droneChar[4].pos[1] = 300.0;
 	gl.droneChar[5].pos[0] = 9252;	gl.droneChar[5].pos[1] = 300.0;
+	gl.droneChar[6].pos[0] = 6336;	gl.droneChar[6].pos[1] = 300.0;
 	//ENEMY
 	gl.enemyChar[0].pos[0] = 768;	gl.enemyChar[0].pos[1] = 0.0;
 	gl.enemyChar[1].pos[0] = 1104;	gl.enemyChar[1].pos[1] = 224.0;
