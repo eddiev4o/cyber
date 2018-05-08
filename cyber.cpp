@@ -1340,7 +1340,7 @@ void droneHitbox() {
 			if (gl.mainChar.health <= 0) {
 				gl.state = STATE_GAMEOVER;
 			}
-			gl.mainChar.health -= 1;
+			gl.mainChar.health -= 3;
 			gl.beams[i] = gl.beams[gl.nbeams - 1];
 			gl.nbeams--;
 		} 
