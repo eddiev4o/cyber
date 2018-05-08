@@ -42,7 +42,7 @@ const float timeslice = 1.0f;
 const float gravity = -0.2f;
 const int MAX_BULLETS = 100;
 const int MAX_ENEMY = 26;
-const int MAX_DRONE = 7;
+const int MAX_DRONE = 8;
 #ifdef USE_OPENAL_SOUND
 ALuint alBuffer[2];
 ALuint alSource[2];
@@ -744,11 +744,12 @@ void init() {
 	//DRONE
 	gl.droneChar[0].pos[0] = 1524;	gl.droneChar[0].pos[1] = 300.0;
 	gl.droneChar[1].pos[0] = 2120;	gl.droneChar[1].pos[1] = 300.0;
-	gl.droneChar[2].pos[0] = 8182;	gl.droneChar[2].pos[1] = 300.0;
-	gl.droneChar[3].pos[0] = 8512;	gl.droneChar[3].pos[1] = 300.0;
-	gl.droneChar[4].pos[0] = 8845;	gl.droneChar[4].pos[1] = 300.0;
-	gl.droneChar[5].pos[0] = 9252;	gl.droneChar[5].pos[1] = 300.0;
-	gl.droneChar[6].pos[0] = 6336;	gl.droneChar[6].pos[1] = 300.0;
+	gl.droneChar[2].pos[0] = 2440;	gl.droneChar[2].pos[1] = 300.0;
+	gl.droneChar[3].pos[0] = 6336;	gl.droneChar[3].pos[1] = 300.0;
+	gl.droneChar[4].pos[0] = 8182;	gl.droneChar[4].pos[1] = 300.0;
+	gl.droneChar[5].pos[0] = 8512;	gl.droneChar[5].pos[1] = 300.0;
+	gl.droneChar[6].pos[0] = 8845;	gl.droneChar[6].pos[1] = 300.0;
+	gl.droneChar[7].pos[0] = 9252;	gl.droneChar[7].pos[1] = 300.0;
 	//ENEMY
 	gl.enemyChar[0].pos[0] = 768;	gl.enemyChar[0].pos[1] = 0.0;
 	gl.enemyChar[1].pos[0] = 1104;	gl.enemyChar[1].pos[1] = 224.0;
@@ -907,6 +908,10 @@ void checkKeys(XEvent *e)
 			gl.walk ^= 1;
 			break;
 		case XK_e:
+			if (gl.state == STATE_STARTUP) {
+				gl.done=1;
+				break;
+			}
 			break;
 		case XK_c:
 			if (gl.state == STATE_STARTUP) {
@@ -1187,6 +1192,18 @@ void tileCollision(Vec *tile) {
 		gl.collisionL = 0;
 	}
 	gl.underFlag =0;
+	//bullet collision
+	for (int i = 0; i < gl.nbullets; i++) {
+		//printf("gl.bullets[i].pos[1]: %f\n", gl.bullets[i].pos[1]);
+		//printf("pos1+miny: %f pos1+maxy: %f\n", (*pos1 + miny), (*pos1 + maxy));
+		if (gl.bullets[i].pos[0] >= *tile[0]
+			&& gl.bullets[i].pos[0] <= (*tile[0]+lev.ftsz[0])
+			&& gl.bullets[i].pos[1] <= *tile[1]+200-lev.ftsz[1] 
+			&& gl.bullets[i].pos[1] >= *tile[1]-lev.ftsz[1]) {
+			gl.bullets[i] = gl.bullets[gl.nbullets - 1];
+			gl.nbullets--;
+		}
+	}
 }
 
 void emptyCollision(Vec *tile) {
@@ -1833,12 +1850,30 @@ void render(void)
 		glPopMatrix();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glDisable(GL_ALPHA_TEST);
-		unsigned int c = 0x002d88d8;	
-		r.bot = gl.yres/2 - 100;
+	    	
+		int h = 50.0;
+		int w = 200.0;			
+		glPushMatrix();
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glColor4f(0.086,0.435,1.0,0.8);
+		glTranslated(gl.xres/2, gl.yres/2-125, 0);
+		glBegin(GL_QUADS);
+			glVertex2i(-w, -h);
+			glVertex2i(-w,  h);
+			glVertex2i(w,   h);
+			glVertex2i(w,  -h);
+		glEnd();
+		glDisable(GL_BLEND);
+		glPopMatrix();
+		
+		unsigned int c = 0x700fad;	
+		r.bot = gl.yres/2 - 125;
 		r.center = 0;
 		r.left = gl.xres/2 - 100;
-		ggprint16(&r, 16, c, "PLAY");
-		ggprint16(&r, 16, c, "CREDITS");
+		ggprint16(&r, 16, c, "Press P - Play");
+		ggprint16(&r, 16, c, "Press C - Credits");
+		ggprint16(&r, 16, c, "Press E - Exit");
 
 	
 	}
