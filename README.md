@@ -23,6 +23,7 @@ Linux terminal:
 2. sudo apt-get install libglu1-mesa-dev freeglut3-dev mesa-common-dev
 3. sudo apt-get install libopenal1 libopenal-dev
 4. sudo apt-get install libalut0 libalut-dev
+5. sudo apt-get install imagemagick
 5. sudo apt-get install g++
 6. sudo apt-get install git-all
 
